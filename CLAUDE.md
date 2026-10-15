@@ -35,24 +35,25 @@ src/
   integration/           # uji terhadap Supabase LOKAL sungguhan (*.local.test.ts; pnpm test:local)
   pages/                 # layar (Beranda, Catatan, Detail, Masuk, Pengaturan, Placeholder)
   components/{ui,layout}/  # komponen sesuai DESIGN.md
-scripts/                 # gen-fixtures.mjs, audit-ui.mjs
+scripts/                 # gen-fixtures.mjs, audit-ui.mjs, e2e-local.mjs, lib/browser.mjs (pembantu bersama)
 ```
 
 ## Perintah
 
-- `pnpm dev`, `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test` (vitest, 68 tes)
+- `pnpm dev`, `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test` (vitest, 84 tes termasuk uji kontrak SQL → Zod)
 - Env (`.env.local`, lihat `.env.example`): `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (hanya kunci publishable/anon). Build produksi **gagal** bila env kosong atau berisi kunci rahasia (`sb_secret_`/`service_role`). Data contoh hanya lewat `pnpm dev:fixture` (`--mode fixture`); build biasa tidak memuatnya.
 - `pnpm test:db` (14 tes skema + RLS + fixture tidak basi, PGlite, ±40 detik)
-- `pnpm test:local` (uji integrasi ke Supabase lokal sungguhan: GoTrue + PostgREST; butuh Docker dan `supabase start`; menolak URL non-lokal karena ledger tidak bisa dihapus)
+- `pnpm test:local` (17 tes integrasi ke Supabase lokal sungguhan: GoTrue + PostgREST + RLS lewat HTTP; butuh Docker dan `supabase start`; menolak URL non-lokal karena ledger tidak bisa dihapus)
+- `pnpm e2e:local` (7 langkah di Chromium asli terhadap stack lokal: login salah/benar, data tampil, sesi bertahan setelah reload, Detail, Keluar, Keluar dari semua perangkat; membangun sendiri ke `dist-e2e/`)
 - `pnpm gen:fixtures` membangkitkan ulang `src/data/fixtures.generated.json` dari SQL asli. Wajib dijalankan setelah migrasi atau `seed.sql` berubah; `test:db` gagal bila lupa.
 - `pnpm audit:ui` (membangun sendiri dalam mode fixture ke `dist-fixture/`): membuka build di Chromium 360px dan 412px, memeriksa overflow, teks < 12px, kontras, target < 44px, nama aksesibel, emoji, angka tabular, termasuk keadaan setelah interaksi; tangkapan layar ke `audit-out/`. Simulasi state: `?fixture=loading|slow|error|empty|signedout`.
 - `supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor,mailpit` (hanya db, gateway, auth, REST; cukup untuk `test:local`), `supabase db reset`. Migrasi + seed sudah terbukti lolos di Postgres Supabase lokal; `supabase functions serve` belum dijalankan.
-- Sebelum menyatakan tugas selesai: `pnpm typecheck && pnpm lint && pnpm test && pnpm test:db` harus lulus.
+- Sebelum menyatakan tugas selesai: `pnpm typecheck && pnpm lint && pnpm test && pnpm test:db` harus lulus. Bila menyentuh auth, data, atau tulis: jalankan juga `pnpm test:local` dan `pnpm e2e:local` (butuh Supabase lokal menyala); bila menyentuh UI: `pnpm audit:ui`.
 
 ## Status implementasi
 
-Sudah: skema + RLS + seed (teruji di PGlite dan Postgres Supabase lokal), lapisan data (DataSource + fixture dari SQL), komponen UI, layar Beranda, Catatan, Detail (baca saja), login pemilik (email + kata sandi; teruji terhadap GoTrue lokal), layar Masuk, Pengaturan bagian Akun (Keluar, Keluar dari semua perangkat).
-Belum: sumber data Supabase (`openDataSource` di mode non-fixture masih melempar galat), Catatan baru (Tambah catatan), Catat pembayaran, Kotak Masuk, Kalender, Pengaturan (selain Akun), RPC `create_debt`, Edge Function, PWA, pemilih buku. Rute belum dibangun menampilkan `Placeholder` yang jujur.
+Sudah: skema + RLS + seed (teruji di PGlite dan Postgres Supabase lokal), lapisan data (DataSource: fixture dari SQL dan Supabase), komponen UI, layar Beranda, Catatan, Detail (baca saja), login pemilik (email + kata sandi), layar Masuk, Pengaturan bagian Akun (Keluar, Keluar dari semua perangkat). Jalur baca Supabase teruji end-to-end di browser terhadap stack lokal (belum terhadap proyek asli).
+Belum: Catatan baru (Tambah catatan), Catat pembayaran, Kotak Masuk, Kalender, Pengaturan (selain Akun), RPC `create_debt`, Edge Function, PWA, pemilih buku. Rute belum dibangun menampilkan `Placeholder` yang jujur.
 
 ## Model data: buku (keputusan)
 

@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:local": "vitest run --config vitest.local.config.ts",
+    "e2e:local": "node scripts/e2e-local.mjs",
     "test:db": "node --test tests/db.test.mjs",
     "gen:fixtures": "node scripts/gen-fixtures.mjs",
     "audit:ui": "vite build --mode fixture --outDir dist-fixture && node scripts/audit-ui.mjs"

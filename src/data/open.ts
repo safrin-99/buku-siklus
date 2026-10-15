@@ -1,3 +1,5 @@
+import { getSupabase } from '../lib/supabase';
+import { createSupabaseSource, loadActiveBook } from './supabaseSource';
 import type { DataSource } from './source';
 
 /**
@@ -10,5 +12,7 @@ export async function openDataSource(): Promise<DataSource | null> {
     const { createFixtureSource } = await import('./fixtureSource');
     return createFixtureSource();
   }
-  throw new Error('Supabase data source is not available in this version yet.');
+  const client = getSupabase();
+  const book = await loadActiveBook(client);
+  return book ? createSupabaseSource(client, book) : null;
 }

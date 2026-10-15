@@ -5,7 +5,7 @@ import globals from 'globals';
 import { defineConfig } from 'eslint/config';
 
 export default defineConfig([
-  { ignores: ['dist', 'dist-fixture', 'audit-out', 'node_modules', 'src/data/fixtures.generated.json'] },
+  { ignores: ['dist', 'dist-fixture', 'dist-e2e', 'audit-out', 'node_modules', 'src/data/fixtures.generated.json'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
