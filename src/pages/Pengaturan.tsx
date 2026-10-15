@@ -37,7 +37,7 @@ function GajianSection() {
   );
 }
 
-/** Account and Gajian are built so far (DESIGN.md section 7.7); the rest is stated honestly below. */
+/** Account (password, sign out) and Gajian are built so far (DESIGN.md section 7.7); the rest is stated honestly below. */
 export function Pengaturan() {
   const { state, signOut } = useAuth();
   const [confirmGlobal, setConfirmGlobal] = useState(false);
@@ -64,7 +64,10 @@ export function Pengaturan() {
       <div className="flex flex-col gap-6 px-4 pb-6">
         <section aria-label="Akun">
           <SectionTitle>Akun</SectionTitle>
-          <div className="flex flex-col gap-4 rounded-card border border-border bg-surface p-4">
+          <LedgerList label="Akun">
+            <SettingRow to="/pengaturan/kata-sandi" label="Kata sandi" value="Ganti" />
+          </LedgerList>
+          <div className="mt-3 flex flex-col gap-4 rounded-card border border-border bg-surface p-4">
             <div>
               <p className="text-caption text-ink-2">Masuk sebagai</p>
               <p className="break-all text-body font-semibold">{email}</p>

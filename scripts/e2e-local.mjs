@@ -11,6 +11,7 @@ const PORT = 4174;
 const BASE = `http://127.0.0.1:${PORT}`;
 const OUT_DIR = 'dist-e2e';
 const PASSWORD = 'kata-sandi-uji-1234';
+const NEW_PASSWORD = 'kata-sandi-baru-e2e-5678';
 
 function readStack() {
   let raw;
@@ -99,6 +100,14 @@ async function main() {
     let consoleErrors = [];
     page.on('console', (m) => m.type() === 'error' && consoleErrors.push(m.text()));
     page.on('pageerror', (e) => consoleErrors.push(String(e)));
+    // A deliberately wrong password makes the browser log the 400 response as a console error. Only that is allowed:
+    // the log must be clean before the attempt and hold nothing but 400s after it.
+    const rejectedOnPurpose = async (attempt) => {
+      assert.deepEqual(consoleErrors, [], `galat konsol tak terduga: ${consoleErrors.join(' | ')}`);
+      await attempt();
+      assert.ok(consoleErrors.length > 0 && consoleErrors.every((m) => m.includes('status of 400')), consoleErrors.join(' | '));
+      consoleErrors = [];
+    };
     const sessionKeys = () => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('sb-') && k.endsWith('-auth-token')));
     const login = async (password) => {
       await page.getByLabel('Email').fill(email);
@@ -113,11 +122,12 @@ async function main() {
     });
 
     await step('kata sandi salah: pesan generik, tetap di /masuk, tanpa sesi tersimpan', async () => {
-      await login('sandi-yang-salah');
-      await page.getByText('Email atau kata sandi salah.').waitFor();
+      await rejectedOnPurpose(async () => {
+        await login('sandi-yang-salah');
+        await page.getByText('Email atau kata sandi salah.').waitFor();
+      });
       assert.equal(new URL(page.url()).pathname, '/masuk');
       assert.deepEqual(await sessionKeys(), []);
-      consoleErrors = []; // the browser logs the 400 response as a console error
     });
 
     await step('masuk benar: Beranda menampilkan data buku ini, bukan data contoh', async () => {
@@ -245,6 +255,26 @@ async function main() {
       assert.ok(!(await page.locator('body').innerText()).includes('Sisa kas setelah cicilan'));
     });
 
+    await step('Ganti kata sandi: sandi saat ini salah ditolak; sesudah berhasil, perangkat ini tetap masuk', async () => {
+      await page.goto(`${BASE}/pengaturan`);
+      await page.getByRole('link', { name: /Kata sandi/ }).click();
+      await page.getByRole('heading', { name: 'Ganti kata sandi', level: 1 }).waitFor();
+      await page.getByLabel('Kata sandi saat ini', { exact: true }).fill('bukan-sandi-ini-123');
+      await page.getByLabel('Kata sandi baru', { exact: true }).fill(NEW_PASSWORD);
+      await page.getByLabel('Ulangi kata sandi baru', { exact: true }).fill(NEW_PASSWORD);
+      await rejectedOnPurpose(async () => {
+        await page.getByRole('button', { name: 'Ganti kata sandi' }).click();
+        await page.getByText('Kata sandi saat ini salah.').waitFor();
+      });
+
+      await page.getByLabel('Kata sandi saat ini', { exact: true }).fill(PASSWORD);
+      await page.getByRole('button', { name: 'Ganti kata sandi' }).click();
+      await page.getByText('Kata sandi sudah diganti.').waitFor();
+      assert.equal((await sessionKeys()).length, 1, 'perangkat ini tetap masuk');
+      await page.getByRole('link', { name: 'Kembali ke Pengaturan' }).click();
+      await page.getByText(email).waitFor();
+    });
+
     await step('Pengaturan menampilkan email; Keluar menghapus sesi dan kembali ke /masuk', async () => {
       await page.goto(`${BASE}/pengaturan`);
       await page.getByText(email).waitFor();
@@ -256,8 +286,12 @@ async function main() {
       assert.ok(!(await page.locator('body').innerText()).includes('Utang Telat E2E'));
     });
 
-    await step('Keluar dari semua perangkat: konfirmasi dulu, lalu sesi hilang', async () => {
-      await login(PASSWORD);
+    await step('Sandi lama ditolak, sandi baru diterima; Keluar dari semua perangkat: konfirmasi dulu, lalu sesi hilang', async () => {
+      await rejectedOnPurpose(async () => {
+        await login(PASSWORD);
+        await page.getByText('Email atau kata sandi salah.').waitFor();
+      });
+      await login(NEW_PASSWORD);
       await page.getByRole('heading', { name: 'Beranda' }).waitFor(); // the debt is settled by now, so it is not listed
       await page.goto(`${BASE}/pengaturan`);
       await page.getByRole('button', { name: 'Keluar dari semua perangkat' }).click();

@@ -22,6 +22,11 @@ describe('classifyAuthError', () => {
     expect(classifyAuthError({ message: 'TypeError: Failed to fetch' })).toBe('offline');
   });
 
+  it('kata sandi baru ditolak server: lemah atau sama dengan yang lama', () => {
+    expect(classifyAuthError({ name: 'AuthWeakPasswordError', status: 422, code: 'weak_password' })).toBe('weak_password');
+    expect(classifyAuthError({ name: 'AuthApiError', status: 422, code: 'same_password' })).toBe('same_password');
+  });
+
   it('selain itu unknown, termasuk nilai bukan objek', () => {
     expect(classifyAuthError({ status: 500, message: 'boom' })).toBe('unknown');
     expect(classifyAuthError('teks')).toBe('unknown');

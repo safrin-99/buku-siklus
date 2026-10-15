@@ -3,6 +3,9 @@
 
 export type AuthFailureKind =
   | 'invalid_credentials'
+  | 'wrong_password'
+  | 'weak_password'
+  | 'same_password'
   | 'unconfirmed'
   | 'rate_limited'
   | 'offline'
@@ -11,6 +14,10 @@ export type AuthFailureKind =
 
 export const AUTH_MESSAGES: Record<AuthFailureKind, string> = {
   invalid_credentials: 'Email atau kata sandi salah.',
+  // Only after signing in: the owner already proved who they are, so naming the wrong field leaks nothing.
+  wrong_password: 'Kata sandi saat ini salah.',
+  weak_password: 'Server menolak kata sandi baru karena terlalu lemah atau terlalu umum. Pakai kata sandi lain yang lebih panjang.',
+  same_password: 'Kata sandi baru sama dengan yang sekarang. Pakai kata sandi lain.',
   unconfirmed: 'Email belum dikonfirmasi. Konfirmasi akun lewat dashboard Supabase, lalu coba lagi.',
   rate_limited: 'Terlalu banyak percobaan. Tunggu beberapa menit, lalu coba lagi.',
   offline: 'Tidak tersambung ke server. Periksa koneksi, lalu coba lagi.',
@@ -45,6 +52,8 @@ export function classifyAuthError(error: unknown): AuthFailureKind {
 
   if (code === 'invalid_credentials' || message.includes('invalid login credentials')) return 'invalid_credentials';
   if (code === 'email_not_confirmed' || message.includes('email not confirmed')) return 'unconfirmed';
+  if (code === 'weak_password') return 'weak_password';
+  if (code === 'same_password') return 'same_password';
   if (status === 429 || code === 'over_request_rate_limit' || code === 'over_email_send_rate_limit') {
     return 'rate_limited';
   }

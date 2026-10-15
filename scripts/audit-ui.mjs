@@ -38,6 +38,7 @@ const ROUTES = [
   '/pengaturan/gajian',
   '/pengaturan/gajian?fixture=loading',
   '/pengaturan/gajian?fixture=error',
+  '/pengaturan/kata-sandi',
   `/catatan/${HENDRA}/bayar`,
   `/catatan/${HENDRA}/bayar?fixture=error`,
   `/catatan/${ARISAN}/bayar`,
@@ -136,6 +137,29 @@ const INTERACTIONS = [
       await page.getByText('Menyimpan…').waitFor();
       yield 'menyimpan';
       await page.getByText('Mode contoh: perubahan tidak disimpan.').waitFor();
+      yield 'galat';
+    },
+  },
+  {
+    route: '/pengaturan/kata-sandi',
+    name: 'kata-sandi',
+    run: async function* (page) {
+      const submit = page.getByRole('button', { name: 'Ganti kata sandi' });
+      await submit.click();
+      await page.getByText('Isi kata sandi saat ini.').waitFor();
+      yield 'validasi-kosong';
+      await page.getByLabel('Kata sandi saat ini', { exact: true }).fill('sandi-lama-contoh');
+      await page.getByLabel('Kata sandi baru', { exact: true }).fill('sandi-baru-contoh');
+      await page.getByLabel('Ulangi kata sandi baru', { exact: true }).fill('sandi-baru-contoh-x');
+      await page.getByRole('button', { name: 'Tampilkan kata sandi baru' }).click();
+      await submit.click();
+      await page.getByText('Tidak sama dengan kata sandi baru. Ketik ulang dengan persis sama.').waitFor();
+      yield 'ulangan-beda';
+      await page.getByLabel('Ulangi kata sandi baru', { exact: true }).fill('sandi-baru-contoh');
+      await submit.click();
+      await page.getByText('Memproses…').waitFor();
+      yield 'memproses';
+      await page.getByText('Mode contoh: tindakan ini tidak tersedia.').waitFor();
       yield 'galat';
     },
   },

@@ -16,6 +16,11 @@ export interface AuthService {
   signIn(email: string, password: string): Promise<void>;
   /** `global` revokes every session of this account on every device. */
   signOut(scope: 'local' | 'global'): Promise<void>;
+  /**
+   * Checks the current password first, then sets the new one. Supabase Auth then revokes every OTHER session of the
+   * account (their refresh tokens); an access token already issued elsewhere stays valid until it expires.
+   */
+  changePassword(currentPassword: string, newPassword: string): Promise<void>;
 }
 
 export function createSupabaseAuthService(client: SupabaseClient): AuthService {
@@ -45,6 +50,24 @@ export function createSupabaseAuthService(client: SupabaseClient): AuthService {
         throw new AuthFailure(classifyAuthError(error));
       }
     },
+    async changePassword(currentPassword, newPassword) {
+      try {
+        const { data } = await client.auth.getSession();
+        const email = data.session?.user.email;
+        if (!email) throw new AuthFailure('unknown');
+        // Supabase does not ask for the current password, so a borrowed unlocked phone could change it. Signing in
+        // again proves it (and a failed attempt leaves the current session as it was).
+        const verified = await client.auth.signInWithPassword({ email, password: currentPassword });
+        if (verified.error) {
+          const kind = classifyAuthError(verified.error);
+          throw new AuthFailure(kind === 'invalid_credentials' ? 'wrong_password' : kind);
+        }
+        const { error } = await client.auth.updateUser({ password: newPassword });
+        if (error) throw error;
+      } catch (error) {
+        throw new AuthFailure(classifyAuthError(error));
+      }
+    },
   };
 }
 
@@ -65,5 +88,6 @@ export function createFixtureAuthService(): AuthService {
     // Delayed briefly so the pending state can be inspected, then rejected.
     signIn: () => new Promise((_resolve, reject) => setTimeout(() => reject(new AuthFailure('readonly')), 1200)),
     signOut: () => Promise.reject(new AuthFailure('readonly')),
+    changePassword: () => new Promise((_resolve, reject) => setTimeout(() => reject(new AuthFailure('readonly')), 1200)),
   };
 }

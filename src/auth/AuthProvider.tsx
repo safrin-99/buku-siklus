@@ -9,6 +9,8 @@ interface AuthContextValue {
   signIn(email: string, password: string): Promise<void>;
   /** Throws AuthFailure on failure. The data cache is cleared after a successful sign out. */
   signOut(scope: 'local' | 'global'): Promise<void>;
+  /** Throws AuthFailure (wrong_password, weak_password, same_password, …). */
+  changePassword(currentPassword: string, newPassword: string): Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -37,7 +39,12 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
     [service, queryClient],
   );
 
-  const value = useMemo(() => ({ state, signIn, signOut }), [state, signIn, signOut]);
+  const changePassword = useCallback(
+    (currentPassword: string, newPassword: string) => service.changePassword(currentPassword, newPassword),
+    [service],
+  );
+
+  const value = useMemo(() => ({ state, signIn, signOut, changePassword }), [state, signIn, signOut, changePassword]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

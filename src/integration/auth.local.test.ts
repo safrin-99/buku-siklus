@@ -2,11 +2,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { AUTH_MESSAGES, AuthFailure } from '../auth/authErrors';
-import { createSupabaseAuthService, type AuthUser } from '../auth/authService';
+import { createSupabaseAuthService, type AuthService, type AuthUser } from '../auth/authService';
 import {
   TEST_PASSWORD,
   adminClient,
   appClient,
+  appClientWithFetch,
   createOwner,
   readLocalStack,
   uniqueEmail,
@@ -131,5 +132,89 @@ describe('keluar', () => {
     // ...but PostgREST only checks the signature and expiry. This is why the JWT expiry should be shortened
     // in the dashboard: the theft window equals the token's remaining lifetime.
     expect((await asThief('/rest/v1/books?select=id&limit=1')).status).toBe(200);
+  });
+});
+
+describe('ganti kata sandi', () => {
+  const NEW_PASSWORD = 'kata-sandi-baru-5678';
+
+  async function signedIn(email: string): Promise<{ client: SupabaseClient; service: AuthService }> {
+    const client = appClient(stack);
+    const service = createSupabaseAuthService(client);
+    await service.signIn(email, TEST_PASSWORD);
+    return { client, service };
+  }
+
+  async function canSignIn(email: string, password: string): Promise<boolean> {
+    const { error } = await appClient(stack).auth.signInWithPassword({ email, password });
+    return error === null;
+  }
+
+  it('sandi saat ini salah: ditolak sebagai wrong_password, sandi tidak berubah, sesi perangkat ini tetap ada', async () => {
+    const email = uniqueEmail('pemilik');
+    await createOwner(admin, email);
+    const { client, service } = await signedIn(email);
+
+    const failure = await failureOf(service.changePassword('bukan-sandi-saat-ini', NEW_PASSWORD));
+    expect(failure.kind).toBe('wrong_password');
+    expect(failure.message).toBe(AUTH_MESSAGES.wrong_password);
+
+    expect((await client.auth.getSession()).data.session?.user.email).toBe(email);
+    expect((await client.auth.getUser()).error).toBeNull();
+    expect(await canSignIn(email, TEST_PASSWORD)).toBe(true);
+    expect(await canSignIn(email, NEW_PASSWORD)).toBe(false);
+  });
+
+  it('berhasil: sandi baru berlaku, sandi lama tidak; perangkat ini tetap masuk, perangkat lain dicabut', async () => {
+    const email = uniqueEmail('pemilik');
+    await createOwner(admin, email);
+    const phone = await signedIn(email);
+    const laptop = await signedIn(email);
+
+    await phone.service.changePassword(TEST_PASSWORD, NEW_PASSWORD);
+
+    expect(await canSignIn(email, NEW_PASSWORD)).toBe(true);
+    expect(await canSignIn(email, TEST_PASSWORD)).toBe(false);
+
+    // This device: the session survives, including a refresh.
+    expect((await phone.client.auth.getUser()).error).toBeNull();
+    const own = await phone.client.auth.refreshSession();
+    expect(own.error).toBeNull();
+    expect(own.data.session).not.toBeNull();
+
+    // Other device: its refresh token was revoked by the password change.
+    const other = await laptop.client.auth.refreshSession();
+    expect(other.error).not.toBeNull();
+    expect(other.data.session).toBeNull();
+  });
+
+  it('sandi baru sama dengan yang lama: ditolak server (same_password)', async () => {
+    const email = uniqueEmail('pemilik');
+    await createOwner(admin, email);
+    const { service } = await signedIn(email);
+    expect((await failureOf(service.changePassword(TEST_PASSWORD, TEST_PASSWORD))).kind).toBe('same_password');
+  });
+
+  it('sandi baru terlalu lemah menurut server: weak_password (validasi klien yang lebih ketat biasanya menahan ini)', async () => {
+    const email = uniqueEmail('pemilik');
+    await createOwner(admin, email);
+    const { service } = await signedIn(email);
+    expect((await failureOf(service.changePassword(TEST_PASSWORD, 'abc'))).kind).toBe('weak_password');
+    expect(await canSignIn(email, TEST_PASSWORD)).toBe(true);
+  });
+
+  it('server tidak terjangkau: offline, tanpa mengubah apa pun', async () => {
+    const email = uniqueEmail('pemilik');
+    await createOwner(admin, email);
+    // Signed in through the real address, then every request fails as if the connection dropped.
+    let online = true;
+    const client = appClientWithFetch(stack, (real) => (input, init) =>
+      online ? real(input, init) : Promise.reject(new TypeError('Failed to fetch')),
+    );
+    const service = createSupabaseAuthService(client);
+    await service.signIn(email, TEST_PASSWORD);
+    online = false;
+    expect((await failureOf(service.changePassword(TEST_PASSWORD, NEW_PASSWORD))).kind).toBe('offline');
+    expect(await canSignIn(email, TEST_PASSWORD)).toBe(true);
   });
 });

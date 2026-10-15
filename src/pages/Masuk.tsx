@@ -1,10 +1,10 @@
-import { Eye, EyeOff } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { AUTH_MESSAGES, AuthFailure } from '../auth/authErrors';
 import { useAuth } from '../auth/AuthProvider';
 import { Button } from '../components/ui/Button';
 import { FormAlert } from '../components/ui/FormAlert';
+import { PasswordField } from '../components/ui/PasswordField';
 import { TextField } from '../components/ui/TextField';
 
 /** Destination after sign in: internal app paths only (never an external address). */
@@ -20,7 +20,6 @@ export function Masuk() {
   const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [reveal, setReveal] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,24 +67,12 @@ export function Masuk() {
           value={email}
           onChange={(event) => setEmail(event.target.value)}
         />
-        <TextField
+        <PasswordField
           label="Kata sandi"
-          type={reveal ? 'text' : 'password'}
           enterKeyHint="go"
           autoComplete="current-password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          trailing={
-            <button
-              type="button"
-              onClick={() => setReveal((value) => !value)}
-              aria-label={reveal ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
-              aria-pressed={reveal}
-              className="grid size-12 place-items-center text-ink-2"
-            >
-              {reveal ? <EyeOff aria-hidden size={20} /> : <Eye aria-hidden size={20} />}
-            </button>
-          }
         />
         {error ? <FormAlert>{error}</FormAlert> : null}
         {/* Directly under the fields, not pinned to the bottom: Chrome on Android does not shrink the layout when the
