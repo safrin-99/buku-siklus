@@ -1,0 +1,7 @@
+node_modules
+dist
+audit-out
+.env
+.env.*
+!.env.example
+*.local

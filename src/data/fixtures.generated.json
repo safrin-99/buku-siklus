@@ -1,0 +1,418 @@
+{
+  "_generated": "Dibangkitkan oleh scripts/gen-fixtures.mjs dari supabase/migrations + seed.sql. Jangan edit manual.",
+  "today": "2026-10-15",
+  "book": {
+    "id": "10000000-0000-4000-8000-000000000001",
+    "name": "Buku Saya",
+    "timezone": "Asia/Makassar"
+  },
+  "inbox_pending": 3,
+  "cycle": {
+    "cycle_start": "2026-10-01",
+    "cycle_end": "2026-10-31",
+    "next_payday": "2026-11-01",
+    "days_to_payday": 17,
+    "base_salary_idr": 9500000,
+    "obligations_idr": 2500000,
+    "paid_idr": 500000,
+    "unpaid_idr": 2000000,
+    "free_idr": 7000000,
+    "carryover_overdue_idr": 0,
+    "total_owe_remaining_idr": 7600000,
+    "total_owed_remaining_idr": 850000,
+    "overdue_count": 1
+  },
+  "debts": [
+    {
+      "debt_id": "20000000-0000-4000-8000-000000000001",
+      "direction": "owe",
+      "name": "dr. Hendra",
+      "description": "Talangan rawat inap",
+      "total_idr": 1500000,
+      "paid_idr": 900000,
+      "remaining_idr": 600000,
+      "next_due_date": "2026-10-11",
+      "next_due_amount_idr": 600000,
+      "next_due_seq": 3,
+      "installment_count": 3,
+      "days_to_due": -4,
+      "status": "overdue"
+    },
+    {
+      "debt_id": "20000000-0000-4000-8000-000000000005",
+      "direction": "owed",
+      "name": "Reza Firdaus",
+      "description": "Tiket kereta",
+      "total_idr": 350000,
+      "paid_idr": 0,
+      "remaining_idr": 350000,
+      "next_due_date": "2026-10-15",
+      "next_due_amount_idr": 350000,
+      "next_due_seq": 1,
+      "installment_count": 1,
+      "days_to_due": 0,
+      "status": "due_soon"
+    },
+    {
+      "debt_id": "20000000-0000-4000-8000-000000000002",
+      "direction": "owe",
+      "name": "Cicilan Laptop",
+      "description": "Home Credit",
+      "total_idr": 7200000,
+      "paid_idr": 1800000,
+      "remaining_idr": 5400000,
+      "next_due_date": "2026-10-25",
+      "next_due_amount_idr": 600000,
+      "next_due_seq": 4,
+      "installment_count": 12,
+      "days_to_due": 10,
+      "status": "active"
+    },
+    {
+      "debt_id": "20000000-0000-4000-8000-000000000003",
+      "direction": "owe",
+      "name": "Pinjaman Koperasi",
+      "description": "Potong gaji",
+      "total_idr": 2400000,
+      "paid_idr": 800000,
+      "remaining_idr": 1600000,
+      "next_due_date": "2026-10-28",
+      "next_due_amount_idr": 800000,
+      "next_due_seq": 2,
+      "installment_count": 3,
+      "days_to_due": 13,
+      "status": "active"
+    },
+    {
+      "debt_id": "20000000-0000-4000-8000-000000000006",
+      "direction": "owed",
+      "name": "Budi Santo",
+      "description": "Modal jualan pulsa",
+      "total_idr": 500000,
+      "paid_idr": 0,
+      "remaining_idr": 500000,
+      "next_due_date": "2026-11-01",
+      "next_due_amount_idr": 500000,
+      "next_due_seq": 1,
+      "installment_count": 1,
+      "days_to_due": 17,
+      "status": "active"
+    },
+    {
+      "debt_id": "20000000-0000-4000-8000-000000000004",
+      "direction": "owe",
+      "name": "Arisan Bulanan RT 04",
+      "description": "Siklus Oktober",
+      "total_idr": 500000,
+      "paid_idr": 500000,
+      "remaining_idr": 0,
+      "next_due_date": null,
+      "next_due_amount_idr": null,
+      "next_due_seq": null,
+      "installment_count": 1,
+      "days_to_due": null,
+      "status": "paid"
+    }
+  ],
+  "meta": [
+    {
+      "debt_id": "20000000-0000-4000-8000-000000000001",
+      "memo": "Pinjaman talangan rawat inap. Ditransfer via BCA. Disepakati cicil 3× tanpa bunga.",
+      "category": "Pribadi",
+      "description": "Talangan rawat inap"
+    },
+    {
+      "debt_id": "20000000-0000-4000-8000-000000000002",
+      "memo": null,
+      "category": "Elektronik",
+      "description": "Home Credit"
+    },
+    {
+      "debt_id": "20000000-0000-4000-8000-000000000003",
+      "memo": null,
+      "category": "Kantor",
+      "description": "Potong gaji"
+    },
+    {
+      "debt_id": "20000000-0000-4000-8000-000000000004",
+      "memo": null,
+      "category": "Lingkungan",
+      "description": "Siklus Oktober"
+    },
+    {
+      "debt_id": "20000000-0000-4000-8000-000000000005",
+      "memo": null,
+      "category": "Teman",
+      "description": "Tiket kereta"
+    },
+    {
+      "debt_id": "20000000-0000-4000-8000-000000000006",
+      "memo": null,
+      "category": "Pinjaman teman",
+      "description": "Modal jualan pulsa"
+    }
+  ],
+  "payments": [
+    {
+      "id": "pay-1",
+      "debt_id": "20000000-0000-4000-8000-000000000002",
+      "paid_on": "2026-07-25",
+      "amount_idr": 600000,
+      "reference": null,
+      "reverses_payment_id": null,
+      "proof_path": null,
+      "note": null
+    },
+    {
+      "id": "pay-2",
+      "debt_id": "20000000-0000-4000-8000-000000000002",
+      "paid_on": "2026-08-25",
+      "amount_idr": 600000,
+      "reference": null,
+      "reverses_payment_id": null,
+      "proof_path": null,
+      "note": null
+    },
+    {
+      "id": "pay-3",
+      "debt_id": "20000000-0000-4000-8000-000000000001",
+      "paid_on": "2026-09-15",
+      "amount_idr": 450000,
+      "reference": null,
+      "reverses_payment_id": null,
+      "proof_path": null,
+      "note": null
+    },
+    {
+      "id": "pay-4",
+      "debt_id": "20000000-0000-4000-8000-000000000002",
+      "paid_on": "2026-09-25",
+      "amount_idr": 600000,
+      "reference": null,
+      "reverses_payment_id": null,
+      "proof_path": null,
+      "note": null
+    },
+    {
+      "id": "pay-5",
+      "debt_id": "20000000-0000-4000-8000-000000000003",
+      "paid_on": "2026-09-28",
+      "amount_idr": 800000,
+      "reference": null,
+      "reverses_payment_id": null,
+      "proof_path": null,
+      "note": null
+    },
+    {
+      "id": "pay-6",
+      "debt_id": "20000000-0000-4000-8000-000000000001",
+      "paid_on": "2026-10-02",
+      "amount_idr": 450000,
+      "reference": "MBCA-829103991",
+      "reverses_payment_id": null,
+      "proof_path": null,
+      "note": null
+    },
+    {
+      "id": "pay-7",
+      "debt_id": "20000000-0000-4000-8000-000000000004",
+      "paid_on": "2026-10-12",
+      "amount_idr": 500000,
+      "reference": null,
+      "reverses_payment_id": null,
+      "proof_path": null,
+      "note": null
+    }
+  ],
+  "installments": [
+    {
+      "id": "20000000-0000-4000-8000-000000000001#1",
+      "debt_id": "20000000-0000-4000-8000-000000000001",
+      "seq": 1,
+      "due_date": "2026-09-15",
+      "amount_idr": 450000,
+      "is_paid": true,
+      "due_remaining_idr": 0
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000001#2",
+      "debt_id": "20000000-0000-4000-8000-000000000001",
+      "seq": 2,
+      "due_date": "2026-09-30",
+      "amount_idr": 450000,
+      "is_paid": true,
+      "due_remaining_idr": 0
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000001#3",
+      "debt_id": "20000000-0000-4000-8000-000000000001",
+      "seq": 3,
+      "due_date": "2026-10-11",
+      "amount_idr": 600000,
+      "is_paid": false,
+      "due_remaining_idr": 600000
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000002#1",
+      "debt_id": "20000000-0000-4000-8000-000000000002",
+      "seq": 1,
+      "due_date": "2026-07-25",
+      "amount_idr": 600000,
+      "is_paid": true,
+      "due_remaining_idr": 0
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000002#2",
+      "debt_id": "20000000-0000-4000-8000-000000000002",
+      "seq": 2,
+      "due_date": "2026-08-25",
+      "amount_idr": 600000,
+      "is_paid": true,
+      "due_remaining_idr": 0
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000002#3",
+      "debt_id": "20000000-0000-4000-8000-000000000002",
+      "seq": 3,
+      "due_date": "2026-09-25",
+      "amount_idr": 600000,
+      "is_paid": true,
+      "due_remaining_idr": 0
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000002#4",
+      "debt_id": "20000000-0000-4000-8000-000000000002",
+      "seq": 4,
+      "due_date": "2026-10-25",
+      "amount_idr": 600000,
+      "is_paid": false,
+      "due_remaining_idr": 600000
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000002#5",
+      "debt_id": "20000000-0000-4000-8000-000000000002",
+      "seq": 5,
+      "due_date": "2026-11-25",
+      "amount_idr": 600000,
+      "is_paid": false,
+      "due_remaining_idr": 600000
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000002#6",
+      "debt_id": "20000000-0000-4000-8000-000000000002",
+      "seq": 6,
+      "due_date": "2026-12-25",
+      "amount_idr": 600000,
+      "is_paid": false,
+      "due_remaining_idr": 600000
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000002#7",
+      "debt_id": "20000000-0000-4000-8000-000000000002",
+      "seq": 7,
+      "due_date": "2027-01-25",
+      "amount_idr": 600000,
+      "is_paid": false,
+      "due_remaining_idr": 600000
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000002#8",
+      "debt_id": "20000000-0000-4000-8000-000000000002",
+      "seq": 8,
+      "due_date": "2027-02-25",
+      "amount_idr": 600000,
+      "is_paid": false,
+      "due_remaining_idr": 600000
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000002#9",
+      "debt_id": "20000000-0000-4000-8000-000000000002",
+      "seq": 9,
+      "due_date": "2027-03-25",
+      "amount_idr": 600000,
+      "is_paid": false,
+      "due_remaining_idr": 600000
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000002#10",
+      "debt_id": "20000000-0000-4000-8000-000000000002",
+      "seq": 10,
+      "due_date": "2027-04-25",
+      "amount_idr": 600000,
+      "is_paid": false,
+      "due_remaining_idr": 600000
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000002#11",
+      "debt_id": "20000000-0000-4000-8000-000000000002",
+      "seq": 11,
+      "due_date": "2027-05-25",
+      "amount_idr": 600000,
+      "is_paid": false,
+      "due_remaining_idr": 600000
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000002#12",
+      "debt_id": "20000000-0000-4000-8000-000000000002",
+      "seq": 12,
+      "due_date": "2027-06-25",
+      "amount_idr": 600000,
+      "is_paid": false,
+      "due_remaining_idr": 600000
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000003#1",
+      "debt_id": "20000000-0000-4000-8000-000000000003",
+      "seq": 1,
+      "due_date": "2026-09-28",
+      "amount_idr": 800000,
+      "is_paid": true,
+      "due_remaining_idr": 0
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000003#2",
+      "debt_id": "20000000-0000-4000-8000-000000000003",
+      "seq": 2,
+      "due_date": "2026-10-28",
+      "amount_idr": 800000,
+      "is_paid": false,
+      "due_remaining_idr": 800000
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000003#3",
+      "debt_id": "20000000-0000-4000-8000-000000000003",
+      "seq": 3,
+      "due_date": "2026-11-28",
+      "amount_idr": 800000,
+      "is_paid": false,
+      "due_remaining_idr": 800000
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000004#1",
+      "debt_id": "20000000-0000-4000-8000-000000000004",
+      "seq": 1,
+      "due_date": "2026-10-12",
+      "amount_idr": 500000,
+      "is_paid": true,
+      "due_remaining_idr": 0
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000005#1",
+      "debt_id": "20000000-0000-4000-8000-000000000005",
+      "seq": 1,
+      "due_date": "2026-10-15",
+      "amount_idr": 350000,
+      "is_paid": false,
+      "due_remaining_idr": 350000
+    },
+    {
+      "id": "20000000-0000-4000-8000-000000000006#1",
+      "debt_id": "20000000-0000-4000-8000-000000000006",
+      "seq": 1,
+      "due_date": "2026-11-01",
+      "amount_idr": 500000,
+      "is_paid": false,
+      "due_remaining_idr": 500000
+    }
+  ]
+}

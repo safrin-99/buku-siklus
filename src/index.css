@@ -1,0 +1,101 @@
+@import 'tailwindcss';
+@import '@fontsource/plus-jakarta-sans/latin-400.css';
+@import '@fontsource/plus-jakarta-sans/latin-500.css';
+@import '@fontsource/plus-jakarta-sans/latin-600.css';
+@import '@fontsource/plus-jakarta-sans/latin-700.css';
+
+/*
+ * Token desain = DESIGN.md. Ini SATU-SATUNYA tempat hex warna dan ukuran font boleh ditulis.
+ * Bawaan Tailwind (warna, ukuran teks, radius, bayangan) sengaja di-reset (`initial`) supaya
+ * kelas liar seperti text-gray-500, text-xs, rounded-xl, shadow-lg tidak bisa dipakai.
+ */
+@theme {
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+
+  --color-*: initial;
+  --color-canvas: #fbf9f5;
+  --color-surface: #ffffff;
+  --color-surface-inset: #f4f1ea;
+  --color-border: #e7e3da;
+  --color-border-strong: #cfc9bc;
+  --color-ink: #1e1b4b;
+  --color-ink-2: #4b5563; /* teks pendukung; satu-satunya teks sekunder di atas surface-inset */
+  --color-muted: #6b7280; /* hanya di atas canvas/surface (4,6:1 dan 4,83:1) */
+  --color-on-ink: #ffffff;
+  --color-primary: #1e1b4b;
+  --color-primary-pressed: #2e2a72;
+  --color-status-due-text: #92400e;
+  --color-status-due-bg: #fffbeb;
+  --color-status-due-mark: #d97706;
+  --color-status-paid-text: #047857;
+  --color-status-paid-bg: #ecfdf5;
+  --color-status-paid-mark: #10b981;
+  --color-status-overdue-text: #b91c1c;
+  --color-status-overdue-bg: #fef2f2;
+  --color-status-overdue-mark: #dc2626;
+  --color-status-neutral-text: #4b5563;
+  --color-status-neutral-bg: #f4f1ea;
+
+  /* Tidak ada ukuran teks di bawah 12px. */
+  --text-*: initial;
+  --text-money-hero: 32px;
+  --text-money-hero--line-height: 38px;
+  --text-money-hero--letter-spacing: -0.02em;
+  --text-money-lg: 20px;
+  --text-money-lg--line-height: 26px;
+  --text-money-lg--letter-spacing: -0.01em;
+  --text-money-md: 16px;
+  --text-money-md--line-height: 22px;
+  --text-title: 20px;
+  --text-title--line-height: 26px;
+  --text-title--letter-spacing: -0.01em;
+  --text-section: 13px;
+  --text-section--line-height: 18px;
+  --text-section--letter-spacing: 0.04em;
+  --text-body: 15px;
+  --text-body--line-height: 22px;
+  --text-caption: 13px;
+  --text-caption--line-height: 18px;
+  --text-label: 12px;
+  --text-label--line-height: 16px;
+  --text-label--letter-spacing: 0.02em;
+
+  --radius-*: initial;
+  --radius-chip: 9999px;
+  --radius-input: 12px;
+  --radius-card: 16px;
+  --radius-sheet: 24px;
+
+  --shadow-*: initial;
+  --shadow-sheet: 0 -8px 24px rgb(30 27 75 / 0.1);
+  --shadow-fab: 0 6px 16px rgb(30 27 75 / 0.25);
+
+  --container-app: 480px;
+}
+
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-border);
+  }
+
+  html {
+    background-color: var(--color-canvas);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-canvas font-sans text-body text-ink antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary-pressed);
+    outline-offset: 2px;
+  }
+
+  a,
+  button {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
