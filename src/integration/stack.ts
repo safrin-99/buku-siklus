@@ -8,6 +8,8 @@ export interface LocalStack {
   apiUrl: string;
   publishableKey: string;
   adminKey: string;
+  /** Mailpit (catches every email the local stack sends). Empty when `supabase status` does not report it. */
+  mailUrl: string;
 }
 
 export function readLocalStack(): LocalStack {
@@ -30,7 +32,7 @@ export function readLocalStack(): LocalStack {
     throw new Error('Uji integrasi hanya boleh berjalan terhadap Supabase lokal (127.0.0.1).');
   }
   if (!publishableKey || !adminKey) throw new Error('Kunci Supabase lokal tidak ditemukan di `supabase status`.');
-  return { apiUrl, publishableKey, adminKey };
+  return { apiUrl, publishableKey, adminKey, mailUrl: env.get('MAILPIT_URL') ?? env.get('INBUCKET_URL') ?? '' };
 }
 
 const noSession = { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } } as const;
@@ -61,4 +63,48 @@ export async function createOwner(admin: SupabaseClient, email: string) {
   const { data, error } = await admin.auth.admin.createUser({ email, password: TEST_PASSWORD, email_confirm: true });
   if (error || !data.user) throw new Error(`Gagal membuat pengguna uji: ${error?.message ?? 'tanpa data'}`);
   return data.user;
+}
+
+interface MailpitList {
+  messages: Array<{ ID: string }>;
+}
+
+function mailpitUrl(stack: LocalStack): string {
+  const host = stack.mailUrl ? new URL(stack.mailUrl).hostname : '';
+  if (host !== '127.0.0.1' && host !== 'localhost') {
+    throw new Error('Mailpit tidak menyala. Jalankan `supabase start` tanpa mengecualikan mailpit, lalu ulangi.');
+  }
+  return stack.mailUrl.replace(/\/$/, '');
+}
+
+/** Number of emails Mailpit holds for `to`. */
+export async function mailCount(stack: LocalStack, to: string): Promise<number> {
+  const response = await fetch(`${mailpitUrl(stack)}/api/v1/search?query=${encodeURIComponent(`to:"${to}"`)}`);
+  return ((await response.json()) as MailpitList).messages.length;
+}
+
+/** The Supabase Auth confirmation link (`/auth/v1/verify?...`) of the newest email to `to`; waits up to 10 s. */
+export async function confirmationLink(stack: LocalStack, to: string): Promise<string> {
+  const base = mailpitUrl(stack);
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const list = (await (await fetch(`${base}/api/v1/search?query=${encodeURIComponent(`to:"${to}"`)}`)).json()) as MailpitList;
+    const newest = list.messages[0];
+    if (newest) {
+      const message = (await (await fetch(`${base}/api/v1/message/${newest.ID}`)).json()) as { HTML: string };
+      const link = [...message.HTML.matchAll(/href="([^"]+)"/g)]
+        .map((match) => (match[1] ?? '').replace(/&amp;/g, '&'))
+        .find((href) => href.includes('/auth/v1/verify'));
+      if (link) return link;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  throw new Error(`Tidak ada email konfirmasi untuk ${to}.`);
+}
+
+/** Opens an email link like a browser would, without following the redirect; returns where it redirects to. */
+export async function openLink(link: string): Promise<URL> {
+  const response = await fetch(link, { redirect: 'manual' });
+  const location = response.headers.get('location');
+  if (!location) throw new Error(`Tautan tidak mengalihkan (status ${response.status}).`);
+  return new URL(location);
 }

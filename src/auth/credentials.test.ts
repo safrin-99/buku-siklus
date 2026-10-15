@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validatePasswordChange } from './credentials';
+import { validateEmailChange, validatePasswordChange } from './credentials';
 
 const ok = { current: 'sandi-lama-123', next: 'sandi-baru-456', confirm: 'sandi-baru-456' };
 
@@ -50,5 +50,39 @@ describe('validatePasswordChange', () => {
       errors: { confirm: 'Tidak sama dengan kata sandi baru. Ketik ulang dengan persis sama.' },
     });
     expect(validatePasswordChange({ ...ok, confirm: `${ok.next} ` }).ok).toBe(false);
+  });
+});
+
+describe('validateEmailChange', () => {
+  const current = 'pemilik@contoh.id';
+
+  it('lolos: email baru dirapikan (spasi, huruf kecil), sandi apa adanya', () => {
+    expect(validateEmailChange({ newEmail: '  Baru@Contoh.ID ', password: ' sandi ' }, current)).toEqual({
+      ok: true,
+      value: { newEmail: 'baru@contoh.id', password: ' sandi ' },
+    });
+  });
+
+  it('kosong semua', () => {
+    expect(validateEmailChange({ newEmail: ' ', password: '' }, current)).toEqual({
+      ok: false,
+      errors: { newEmail: 'Isi email baru.', password: 'Isi kata sandi untuk memastikan ini kamu.' },
+    });
+  });
+
+  it('bentuk jelas salah ditolak sebelum email dikirim', () => {
+    for (const bad of ['bukan-email', 'a@b', 'a b@c.id', '@contoh.id', 'nama@']) {
+      expect(validateEmailChange({ newEmail: bad, password: 'x' }, current)).toMatchObject({
+        ok: false,
+        errors: { newEmail: 'Alamat email tidak valid. Contoh: nama@gmail.com.' },
+      });
+    }
+  });
+
+  it('sama dengan email sekarang (beda huruf besar pun) ditolak', () => {
+    expect(validateEmailChange({ newEmail: 'PEMILIK@contoh.id', password: 'x' }, current)).toMatchObject({
+      ok: false,
+      errors: { newEmail: 'Ini email yang sedang dipakai.' },
+    });
   });
 });

@@ -39,6 +39,12 @@ const ROUTES = [
   '/pengaturan/gajian?fixture=loading',
   '/pengaturan/gajian?fixture=error',
   '/pengaturan/kata-sandi',
+  '/pengaturan?fixture=emailpending',
+  '/pengaturan/email',
+  '/pengaturan/email?fixture=emailpending',
+  '/pengaturan/email?konfirmasi=sebagian&fixture=emailpending',
+  '/pengaturan/email?konfirmasi=selesai',
+  '/pengaturan/email?konfirmasi=gagal',
   `/catatan/${HENDRA}/bayar`,
   `/catatan/${HENDRA}/bayar?fixture=error`,
   `/catatan/${ARISAN}/bayar`,
@@ -159,6 +165,27 @@ const INTERACTIONS = [
       await submit.click();
       await page.getByText('Memproses…').waitFor();
       yield 'memproses';
+      await page.getByText('Mode contoh: tindakan ini tidak tersedia.').waitFor();
+      yield 'galat';
+    },
+  },
+  {
+    route: '/pengaturan/email',
+    name: 'email',
+    run: async function* (page) {
+      const submit = page.getByRole('button', { name: 'Kirim tautan konfirmasi' });
+      await submit.click();
+      await page.getByText('Isi email baru.').waitFor();
+      yield 'validasi-kosong';
+      await page.getByLabel('Email baru').fill('contoh@buku-siklus.local');
+      await page.getByLabel('Kata sandi', { exact: true }).fill('rahasia-contoh');
+      await submit.click();
+      await page.getByText('Ini email yang sedang dipakai.').waitFor();
+      yield 'email-sama';
+      await page.getByLabel('Email baru').fill('nama-yang-sangat-panjang-sekali.untuk-uji@subdomain.contoh-domain.co.id');
+      await submit.click();
+      await page.getByText('Mengirim…').waitFor();
+      yield 'mengirim';
       await page.getByText('Mode contoh: tindakan ini tidak tersedia.').waitFor();
       yield 'galat';
     },

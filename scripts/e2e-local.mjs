@@ -24,7 +24,25 @@ function readStack() {
   const apiUrl = env.API_URL ?? '';
   const host = apiUrl ? new URL(apiUrl).hostname : '';
   if (host !== '127.0.0.1' && host !== 'localhost') throw new Error('e2e hanya boleh berjalan terhadap Supabase lokal.');
-  return { apiUrl, publishableKey: env.PUBLISHABLE_KEY ?? env.ANON_KEY, adminKey: env.SERVICE_ROLE_KEY ?? env.SECRET_KEY };
+  const mailUrl = env.MAILPIT_URL ?? env.INBUCKET_URL ?? '';
+  if (!mailUrl || !['127.0.0.1', 'localhost'].includes(new URL(mailUrl).hostname)) {
+    throw new Error('Mailpit tidak menyala. Jalankan `supabase start` tanpa mengecualikan mailpit.');
+  }
+  return { apiUrl, publishableKey: env.PUBLISHABLE_KEY ?? env.ANON_KEY, adminKey: env.SERVICE_ROLE_KEY ?? env.SECRET_KEY, mailUrl };
+}
+
+/** The Supabase Auth confirmation link in the newest email Mailpit caught for `to` (waits up to 10 s). */
+async function confirmationLink(mailUrl, to) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const list = await (await fetch(`${mailUrl}/api/v1/search?query=${encodeURIComponent(`to:"${to}"`)}`)).json();
+    if (list.messages[0]) {
+      const message = await (await fetch(`${mailUrl}/api/v1/message/${list.messages[0].ID}`)).json();
+      const link = [...message.HTML.matchAll(/href="([^"]+)"/g)].map((m) => m[1].replace(/&amp;/g, '&')).find((h) => h.includes('/auth/v1/verify'));
+      if (link) return link;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  throw new Error(`Tidak ada email konfirmasi untuk ${to}.`);
 }
 
 const noSession = { auth: { persistSession: false, autoRefreshToken: false } };
@@ -66,7 +84,9 @@ async function seed(stack) {
 
 async function main() {
   const stack = readStack();
-  const { email, debtId, owner } = await seed(stack);
+  const seeded = await seed(stack);
+  const { debtId, owner } = seeded;
+  let email = seeded.email; // replaced by the email-change step
   // Ground truth for the payment steps: read the ledger straight from the database, not from the UI.
   const ledger = async () => {
     const { data, error } = await owner.from('payments').select('amount_idr, reverses_payment_id, reference, note').eq('debt_id', debtId).order('created_at');
@@ -273,6 +293,39 @@ async function main() {
       assert.equal((await sessionKeys()).length, 1, 'perangkat ini tetap masuk');
       await page.getByRole('link', { name: 'Kembali ke Pengaturan' }).click();
       await page.getByText(email).waitFor();
+    });
+
+    await step('Ganti email: dua tautan dari Mailpit; token tidak tersisa di URL, sesi tautan dicabut, email baru tampil', async () => {
+      const newEmail = `e2e-baru-${Date.now().toString(36)}@uji.local`;
+      await page.goto(`${BASE}/pengaturan`);
+      await page.getByRole('link', { name: /^Email/ }).click();
+      await page.getByRole('heading', { name: 'Ganti email', level: 1 }).waitFor();
+      await page.getByLabel('Email baru').fill(newEmail);
+      await page.getByLabel('Kata sandi', { exact: true }).fill(NEW_PASSWORD);
+      await page.getByRole('button', { name: 'Kirim tautan konfirmasi' }).click();
+      await page.getByText('Menunggu konfirmasi').waitFor();
+      await page.getByText(newEmail).waitFor();
+
+      // Old address first: accepted, still waiting for the other link.
+      await page.goto(await confirmationLink(stack.mailUrl, email));
+      await page.getByText('Tautan pertama diterima.').waitFor();
+      assert.equal(new URL(page.url()).hash, '');
+      assert.equal(new URL(page.url()).search, '?konfirmasi=sebagian');
+
+      // New address: done. The redirect brings tokens in the fragment; the app must drop them and revoke that session.
+      const revoked = page.waitForRequest((r) => r.url().includes('/auth/v1/logout') && r.method() === 'POST');
+      await page.goto(await confirmationLink(stack.mailUrl, newEmail));
+      await revoked;
+      await page.getByText('Email sudah diganti.').waitFor();
+      assert.ok(!page.url().includes('token'), `token tersisa di URL: ${page.url()}`);
+      assert.equal(new URL(page.url()).search, '?konfirmasi=selesai');
+      await page.getByRole('region', { name: 'Email saat ini' }).getByText(newEmail).waitFor();
+      assert.equal(await page.getByText('Menunggu konfirmasi').count(), 0);
+      assert.equal((await sessionKeys()).length, 1, 'perangkat ini tetap masuk');
+
+      const { data } = await createClient(stack.apiUrl, stack.adminKey, noSession).auth.admin.listUsers({ perPage: 1000 });
+      assert.ok(data.users.some((u) => u.email === newEmail), 'email berganti di database');
+      email = newEmail;
     });
 
     await step('Pengaturan menampilkan email; Keluar menghapus sesi dan kembali ke /masuk', async () => {

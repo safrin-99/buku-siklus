@@ -4,6 +4,7 @@ import { Beranda } from '../pages/Beranda';
 import { Catatan } from '../pages/Catatan';
 import { CatatPembayaran } from '../pages/CatatPembayaran';
 import { Detail } from '../pages/Detail';
+import { Email } from '../pages/Email';
 import { Gajian } from '../pages/Gajian';
 import { KataSandi } from '../pages/KataSandi';
 import { Masuk } from '../pages/Masuk';
@@ -38,6 +39,7 @@ export function App() {
           <Route path="pengaturan" element={<Pengaturan />} />
           <Route path="pengaturan/gajian" element={<Gajian />} />
           <Route path="pengaturan/kata-sandi" element={<KataSandi />} />
+          <Route path="pengaturan/email" element={<Email />} />
           <Route path="*" element={<Placeholder title="Halaman tidak ditemukan" back />} />
         </Route>
       </Route>

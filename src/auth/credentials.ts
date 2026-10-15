@@ -33,3 +33,32 @@ export function validatePasswordChange(values: PasswordChangeValues): PasswordCh
   if (Object.keys(errors).length > 0) return { ok: false, errors };
   return { ok: true, value: { current, next } };
 }
+
+export interface EmailChangeValues {
+  newEmail: string;
+  password: string;
+}
+
+export type EmailChangeField = keyof EmailChangeValues;
+
+export type EmailChangeValidation =
+  | { ok: true; value: EmailChangeValues }
+  | { ok: false; errors: Partial<Record<EmailChangeField, string>> };
+
+// Deliberately loose: the server has the final say; this only catches obvious typos before an email is sent.
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** The new email is trimmed and lower-cased, as Supabase Auth stores it. */
+export function validateEmailChange(values: EmailChangeValues, currentEmail: string): EmailChangeValidation {
+  const errors: Partial<Record<EmailChangeField, string>> = {};
+  const newEmail = values.newEmail.trim().toLowerCase();
+
+  if (newEmail === '') errors.newEmail = 'Isi email baru.';
+  else if (!EMAIL_SHAPE.test(newEmail)) errors.newEmail = 'Alamat email tidak valid. Contoh: nama@gmail.com.';
+  else if (newEmail === currentEmail.trim().toLowerCase()) errors.newEmail = 'Ini email yang sedang dipakai.';
+
+  if (values.password === '') errors.password = 'Isi kata sandi untuk memastikan ini kamu.';
+
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+  return { ok: true, value: { newEmail, password: values.password } };
+}

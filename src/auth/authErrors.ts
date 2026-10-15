@@ -6,6 +6,10 @@ export type AuthFailureKind =
   | 'wrong_password'
   | 'weak_password'
   | 'same_password'
+  | 'email_taken'
+  | 'email_invalid'
+  | 'email_not_authorized'
+  | 'email_send_failed'
   | 'unconfirmed'
   | 'rate_limited'
   | 'offline'
@@ -18,6 +22,11 @@ export const AUTH_MESSAGES: Record<AuthFailureKind, string> = {
   wrong_password: 'Kata sandi saat ini salah.',
   weak_password: 'Server menolak kata sandi baru karena terlalu lemah atau terlalu umum. Pakai kata sandi lain yang lebih panjang.',
   same_password: 'Kata sandi baru sama dengan yang sekarang. Pakai kata sandi lain.',
+  email_taken: 'Email ini sudah dipakai akun lain. Pakai email lain.',
+  email_invalid: 'Alamat email ditolak server karena formatnya tidak valid. Periksa penulisannya.',
+  email_not_authorized:
+    'Pengirim email bawaan Supabase hanya boleh mengirim ke anggota tim proyek. Pasang SMTP sendiri di dashboard Supabase (Authentication > Emails > SMTP Settings), lalu coba lagi.',
+  email_send_failed: 'Email konfirmasi gagal dikirim. Periksa pengaturan SMTP proyek Supabase, lalu coba lagi.',
   unconfirmed: 'Email belum dikonfirmasi. Konfirmasi akun lewat dashboard Supabase, lalu coba lagi.',
   rate_limited: 'Terlalu banyak percobaan. Tunggu beberapa menit, lalu coba lagi.',
   offline: 'Tidak tersambung ke server. Periksa koneksi, lalu coba lagi.',
@@ -59,4 +68,21 @@ export function classifyAuthError(error: unknown): AuthFailureKind {
   }
   if (e.name === 'AuthRetryableFetchError' || status === 0 || message.includes('failed to fetch')) return 'offline';
   return 'unknown';
+}
+
+/**
+ * Errors of the email-change request. Checked before classifyAuthError because a failed send comes back as
+ * AuthRetryableFetchError with status 500 ("Error sending email change email"), which would otherwise read "offline".
+ */
+export function classifyEmailChangeError(error: unknown): AuthFailureKind {
+  if (typeof error === 'object' && error !== null && !(error instanceof AuthFailure)) {
+    const e = error as ErrorLike;
+    const code = typeof e.code === 'string' ? e.code : '';
+    const status = typeof e.status === 'number' ? e.status : undefined;
+    if (code === 'email_exists') return 'email_taken';
+    if (code === 'email_address_invalid' || code === 'validation_failed') return 'email_invalid';
+    if (code === 'email_address_not_authorized') return 'email_not_authorized';
+    if (status !== undefined && status >= 500) return 'email_send_failed';
+  }
+  return classifyAuthError(error);
 }

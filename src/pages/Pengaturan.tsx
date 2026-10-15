@@ -37,13 +37,14 @@ function GajianSection() {
   );
 }
 
-/** Account (password, sign out) and Gajian are built so far (DESIGN.md section 7.7); the rest is stated honestly below. */
+/** Account (email, password, sign out) and Gajian are built so far (DESIGN.md section 7.7); the rest is stated honestly below. */
 export function Pengaturan() {
   const { state, signOut } = useAuth();
   const [confirmGlobal, setConfirmGlobal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const email = state.status === 'signedIn' ? state.user.email : '';
+  const pendingEmail = state.status === 'signedIn' ? state.user.pendingEmail : null;
 
   async function run(scope: 'local' | 'global') {
     if (busy) return;
@@ -65,13 +66,19 @@ export function Pengaturan() {
         <section aria-label="Akun">
           <SectionTitle>Akun</SectionTitle>
           <LedgerList label="Akun">
+            <SettingRow
+              to="/pengaturan/email"
+              label="Email"
+              value={
+                <>
+                  <span className="block break-all">{email}</span>
+                  {pendingEmail ? <span className="block text-caption">Menunggu konfirmasi</span> : null}
+                </>
+              }
+            />
             <SettingRow to="/pengaturan/kata-sandi" label="Kata sandi" value="Ganti" />
           </LedgerList>
           <div className="mt-3 flex flex-col gap-4 rounded-card border border-border bg-surface p-4">
-            <div>
-              <p className="text-caption text-ink-2">Masuk sebagai</p>
-              <p className="break-all text-body font-semibold">{email}</p>
-            </div>
             {error ? <FormAlert>{error}</FormAlert> : null}
             <Button variant="secondary" disabled={busy} onClick={() => void run('local')}>
               Keluar

@@ -17,7 +17,7 @@ Sumber kebenaran desain: `DESIGN.md` (token, komponen, layar, data kanonik). Bac
 
 ```
 supabase/
-  config.toml            # konfigurasi LOKAL (supabase start); sign-up dimatikan. Bukan sumber kebenaran proyek asli
+  config.toml            # konfigurasi LOKAL (supabase start); sign-up dimatikan, konfirmasi email aktif seperti proyek asli. Bukan sumber kebenaran proyek asli
   migrations/            # SQL berurutan, jangan edit migrasi yang sudah diterapkan
   scripts/first-book.sql # dijalankan manual SEKALI di SQL Editor untuk membuat buku pertama (bukan migrasi)
   functions/
@@ -29,30 +29,30 @@ tests/
   db.test.mjs            # uji skema + RLS dengan PGlite (node --test)
 src/
   app/                   # routing, guard (RequireAuth), gerbang data (DataGate), galat konfigurasi
-  auth/                  # AuthService (Supabase + fixture), pemetaan galat, validasi kata sandi, AuthProvider
+  auth/                  # AuthService (Supabase + fixture), pemetaan galat, validasi akun, tautan email (authLink), AuthProvider
   lib/{money,dates,status,derive,cx,config,env,supabase}.ts
   data/                  # DataSource, konteks, skema Zod, fixture hasil SQL
   integration/           # uji terhadap Supabase LOKAL sungguhan (*.local.test.ts; pnpm test:local)
-  pages/                 # layar (Beranda, Catatan, Detail, Masuk, Pengaturan, Gajian, KataSandi, Placeholder)
+  pages/                 # layar (Beranda, Catatan, Detail, Masuk, Pengaturan, Gajian, KataSandi, Email, Placeholder)
   components/{ui,layout}/  # komponen sesuai DESIGN.md
 scripts/                 # gen-fixtures.mjs, audit-ui.mjs, e2e-local.mjs, lib/browser.mjs (pembantu bersama)
 ```
 
 ## Perintah
 
-- `pnpm dev`, `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test` (vitest, 125 tes termasuk uji kontrak SQL → Zod)
+- `pnpm dev`, `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test` (vitest, 140 tes termasuk uji kontrak SQL → Zod)
 - Env (`.env.local`, lihat `.env.example`): `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (hanya kunci publishable/anon). Build produksi **gagal** bila env kosong atau berisi kunci rahasia (`sb_secret_`/`service_role`). Data contoh hanya lewat `pnpm dev:fixture` (`--mode fixture`); build biasa tidak memuatnya.
 - `pnpm test:db` (17 tes skema + RLS + ledger + fixture tidak basi, PGlite, ±50 detik)
-- `pnpm test:local` (44 tes integrasi ke Supabase lokal sungguhan: GoTrue + PostgREST + RLS lewat HTTP, termasuk tulis ledger dengan gangguan jaringan yang disuntikkan; butuh Docker dan `supabase start`; menolak URL non-lokal karena ledger tidak bisa dihapus)
-- `pnpm e2e:local` (14 langkah di Chromium asli terhadap stack lokal, dicek silang ke database: login, data, sesi bertahan setelah reload, Catat pembayaran (klik ganda = satu baris), offline ditolak, pembatalan dengan entri pembalik, pelunasan, Gajian, Ganti kata sandi, Keluar, Keluar dari semua perangkat; membangun sendiri ke `dist-e2e/`)
+- `pnpm test:local` (50 tes integrasi ke Supabase lokal sungguhan: GoTrue + PostgREST + RLS lewat HTTP, termasuk tulis ledger dengan gangguan jaringan yang disuntikkan dan ganti email dengan tautan asli dari Mailpit; butuh Docker dan `supabase start` termasuk Mailpit; menolak URL non-lokal karena ledger tidak bisa dihapus)
+- `pnpm e2e:local` (15 langkah di Chromium asli terhadap stack lokal, dicek silang ke database: login, data, sesi bertahan setelah reload, Catat pembayaran (klik ganda = satu baris), offline ditolak, pembatalan dengan entri pembalik, pelunasan, Gajian, Ganti kata sandi, Ganti email (kedua tautan dari Mailpit), Keluar, Keluar dari semua perangkat; membangun sendiri ke `dist-e2e/`)
 - `pnpm gen:fixtures` membangkitkan ulang `src/data/fixtures.generated.json` dari SQL asli. Wajib dijalankan setelah migrasi atau `seed.sql` berubah; `test:db` gagal bila lupa.
 - `pnpm audit:ui` (membangun sendiri dalam mode fixture ke `dist-fixture/`): membuka build di Chromium 360px dan 412px, memeriksa overflow, teks < 12px, kontras, target < 44px, nama aksesibel, emoji, angka tabular, termasuk keadaan setelah interaksi; tangkapan layar ke `audit-out/`. Simulasi state: `?fixture=loading|slow|error|empty|signedout`.
-- `supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor,mailpit` (hanya db, gateway, auth, REST; cukup untuk `test:local`), `supabase db reset`. Migrasi + seed sudah terbukti lolos di Postgres Supabase lokal; `supabase functions serve` belum dijalankan.
+- `supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor` (db, gateway, auth, REST, Mailpit di 127.0.0.1:54324; cukup untuk `test:local` dan `e2e:local`), `supabase db reset`. Migrasi + seed sudah terbukti lolos di Postgres Supabase lokal; `supabase functions serve` belum dijalankan.
 - Sebelum menyatakan tugas selesai: `pnpm typecheck && pnpm lint && pnpm test && pnpm test:db` harus lulus. Bila menyentuh auth, data, atau tulis: jalankan juga `pnpm test:local` dan `pnpm e2e:local` (butuh Supabase lokal menyala); bila menyentuh UI: `pnpm audit:ui`.
 
 ## Status implementasi
 
-Sudah: skema + RLS + seed (teruji di PGlite dan Postgres Supabase lokal), lapisan data (DataSource: fixture dari SQL dan Supabase), komponen UI, layar Beranda, Catatan, Detail, login pemilik (email + kata sandi), layar Masuk, Pengaturan bagian Akun (Ganti kata sandi, Keluar, Keluar dari semua perangkat) dan Gajian (tanggal gajian, gaji pokok), Catat pembayaran dan pembatalan lewat entri pembalik. Jalur baca dan tulis Supabase teruji end-to-end di browser terhadap stack lokal (belum terhadap proyek asli).
+Sudah: skema + RLS + seed (teruji di PGlite dan Postgres Supabase lokal), lapisan data (DataSource: fixture dari SQL dan Supabase), komponen UI, layar Beranda, Catatan, Detail, login pemilik (email + kata sandi), layar Masuk, Pengaturan bagian Akun (Ganti email, Ganti kata sandi, Keluar, Keluar dari semua perangkat) dan Gajian (tanggal gajian, gaji pokok), Catat pembayaran dan pembatalan lewat entri pembalik. Jalur baca dan tulis Supabase teruji end-to-end di browser terhadap stack lokal (belum terhadap proyek asli).
 Belum: Catatan baru (Tambah catatan), memo yang bisa diedit, foto bukti pembayaran (`proof_path`, butuh bucket Storage), tombol `Ingatkan lewat WhatsApp`, Kotak Masuk, Kalender, Pengaturan (selain Akun dan Gajian; opsi geser ke hari kerja belum), RPC `create_debt`, Edge Function, PWA, pemilih buku. Rute belum dibangun menampilkan `Placeholder` yang jujur.
 
 ## Model data: buku (keputusan)
@@ -98,6 +98,7 @@ Belum: Catatan baru (Tambah catatan), memo yang bisa diedit, foto bukti pembayar
 - **Satu pemilik = matikan pendaftaran publik.** Di Supabase Auth nonaktifkan sign-up setelah akun pemilik dibuat (atau batasi ke satu email). RLS tetap mengisolasi data, tapi pendaftaran terbuka memberi orang asing akun dan beban pada kuota proyek.
 - HP hilang = data keuangan terbuka. Sesi PWA harus bisa dicabut (Supabase: sign out semua sesi) dan layar kunci perangkat aktif. Pertimbangkan kunci aplikasi (PIN/biometrik) setelah v1. **Batas yang terbukti (uji lokal):** "Keluar dari semua perangkat" mencabut refresh token dan ditolak GoTrue, tetapi token akses yang sudah terbit tetap diterima PostgREST sampai kedaluwarsa. Persingkat `JWT expiry` di dashboard (Authentication > Sessions/JWT) untuk mempersempit jendela itu.
 - Ganti kata sandi (`AuthService.changePassword`): kata sandi saat ini diverifikasi dulu lewat masuk ulang, karena Supabase tidak memintanya. Minimal 10 karakter dan maksimal 72 byte (batas bcrypt) di klien; samakan "Minimum password length" di dashboard (Authentication > Providers > Email) agar server ikut menegakkannya. **Terbukti (uji lokal):** sesudah ganti, refresh token perangkat lain dicabut, sesi perangkat ini bertahan; token akses yang sudah terbit tetap berlaku sampai kedaluwarsa (sama seperti di atas). "Secure password change" dibiarkan mati; alur ini belum diuji dengan opsi itu menyala (opsi itu meminta kode lewat email bila sesi lebih tua dari 24 jam, sedangkan masuk ulang di atas membuat sesi baru).
+- Ganti email (`AuthService.changeEmail`): kata sandi diverifikasi dulu (masuk ulang). Supabase mengirim tautan ke email lama dan baru; email baru berlaku setelah keduanya dibuka (**terbukti lokal:** GoTrue hanya meminta dua konfirmasi bila "Confirm email" aktif, karena itu `enable_confirmations = true` di config.toml). Tautan kembali ke `/pengaturan/email` dengan hasil di fragmen URL; tautan terakhir membawa **sesi baru** (access + refresh token). Aplikasi tidak pernah masuk dari URL: `main.tsx` membuang fragmen dari address bar sebelum render (sisa `?konfirmasi=`), lalu mencabut sesi itu (`/logout` dengan tokennya sendiri). Butuh tugas di dashboard: SMTP sendiri (pengirim bawaan hanya mengirim ke anggota tim proyek, maks. beberapa email per jam) dan alamat aplikasi di Authentication > URL Configuration (Site URL + Redirect URLs), kalau tidak tautan mendarat di Site URL.
 - Hanya kunci publishable/anon yang boleh ada di env klien (`VITE_*` ditanam ke bundle). `config.ts` menolak `sb_secret_` dan JWT `service_role`, dan `vite build` gagal bila terdeteksi. Cache TanStack dikosongkan saat keluar; sesi tidak dibaca dari URL (`detectSessionInUrl: false`).
 - Webhook `ingest-notification`: verifikasi HMAC-SHA256 (header tanda tangan + timestamp, toleransi ±5 menit), allowlist nama paket aplikasi, kunci idempotensi (hash paket+waktu+teks), batasi laju. Tolak selain itu dengan 401/429, tanpa detail.
 - Bucket Storage untuk foto struk privat; akses lewat signed URL berumur pendek.

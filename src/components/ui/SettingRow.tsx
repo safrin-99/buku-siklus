@@ -14,7 +14,7 @@ export function SettingRow({ to, label, value }: Props) {
   return (
     <li>
       <Link to={to} className="flex min-h-14 items-center justify-between gap-3 px-4 py-3 active:bg-surface-inset focus-visible:outline-offset-[-2px]">
-        <span className="text-body font-semibold">{label}</span>
+        <span className="shrink-0 text-body font-semibold">{label}</span>
         <span className="flex min-w-0 items-center gap-1 text-body text-ink-2">
           {value !== undefined ? <span className="min-w-0 break-words text-right tabular-nums">{value}</span> : null}
           <ChevronRight aria-hidden size={20} className="shrink-0" />

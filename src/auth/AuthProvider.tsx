@@ -11,6 +11,9 @@ interface AuthContextValue {
   signOut(scope: 'local' | 'global'): Promise<void>;
   /** Throws AuthFailure (wrong_password, weak_password, same_password, …). */
   changePassword(currentPassword: string, newPassword: string): Promise<void>;
+  /** Throws AuthFailure (wrong_password, email_taken, email_send_failed, …). Links come back to /pengaturan/email. */
+  changeEmail(newEmail: string, password: string): Promise<void>;
+  refreshUser(): Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -44,7 +47,18 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
     [service],
   );
 
-  const value = useMemo(() => ({ state, signIn, signOut, changePassword }), [state, signIn, signOut, changePassword]);
+  const changeEmail = useCallback(
+    (newEmail: string, password: string) =>
+      service.changeEmail(newEmail, password, `${window.location.origin}/pengaturan/email`),
+    [service],
+  );
+
+  const refreshUser = useCallback(() => service.refreshUser(), [service]);
+
+  const value = useMemo(
+    () => ({ state, signIn, signOut, changePassword, changeEmail, refreshUser }),
+    [state, signIn, signOut, changePassword, changeEmail, refreshUser],
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
