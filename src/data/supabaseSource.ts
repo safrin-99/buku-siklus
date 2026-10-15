@@ -3,8 +3,9 @@ import { z } from 'zod';
 import { todayInZone } from '../lib/dates';
 import { bookSchema, isUuid, pickActiveBook, type Book } from './book';
 import { mapInstallmentRow } from './mappers';
-import { cycleSummarySchema, debtMetaSchema, debtRowSchema, paymentRowSchema } from './schemas';
+import { bookSettingsRowSchema, cycleSummarySchema, debtMetaSchema, debtRowSchema, paymentRowSchema } from './schemas';
 import { PaymentWriteError } from './paymentErrors';
+import { SettingsWriteError } from './settingsErrors';
 import { settleWrite } from './settle';
 import { NotFoundError, type DataSource, type DebtDetail } from './source';
 
@@ -17,6 +18,7 @@ export const COLUMNS = {
   meta: 'id, memo, category, description',
   payment: 'id, debt_id, paid_on, amount_idr, reference, reverses_payment_id, proof_path, note',
   installment: 'installment_id, debt_id, seq, due_date, amount_idr, is_paid, due_remaining_idr',
+  bookSettings: 'id, name, payday_day, base_salary_idr',
 } as const;
 
 /** Deliberately generic: server messages are not shown or logged (they can name tables and constraints). */
@@ -132,6 +134,25 @@ export function createSupabaseSource(client: SupabaseClient, book: Book): DataSo
         reverses_payment_id: reversal.reversesPaymentId,
         note: reversal.note,
       }),
+
+    async bookSettings() {
+      const rows = z.array(bookSettingsRowSchema).parse(unwrap(await client.from('books').select(COLUMNS.bookSettings).eq('id', bookId)));
+      const [row] = rows;
+      if (!row) throw new NotFoundError('buku');
+      return { name: row.name, paydayDay: row.payday_day, baseSalaryIdr: row.base_salary_idr };
+    },
+
+    async updateBookSettings(update) {
+      const result = await client
+        .from('books')
+        .update({ payday_day: update.paydayDay, base_salary_idr: update.baseSalaryIdr })
+        .eq('id', bookId)
+        .select('id');
+      // PostgREST/Postgres errors carry a code; a transport failure has an empty one.
+      if (result.error) throw new SettingsWriteError(result.error.code ? 'rejected' : 'network');
+      // Row-level security filters rows the user may not update instead of failing: zero rows means "not allowed".
+      if (!result.data || result.data.length !== 1) throw new SettingsWriteError('rejected');
+    },
 
     async inboxPendingCount() {
       const { count, error } = await client

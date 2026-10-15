@@ -29,6 +29,19 @@ export interface NewReversal {
   note: string | null;
 }
 
+/** Per-book settings the owner can change (DESIGN.md section 7.7, "Gajian"). */
+export interface BookSettings {
+  name: string;
+  paydayDay: number;
+  /** null = not used: the cycle card then shows "Kewajiban siklus" instead of "Sisa kas setelah cicilan". */
+  baseSalaryIdr: number | null;
+}
+
+export interface BookSettingsUpdate {
+  paydayDay: number;
+  baseSalaryIdr: number | null;
+}
+
 export class NotFoundError extends Error {
   constructor(what: string) {
     super(`NOT_FOUND: ${what}`);
@@ -55,4 +68,7 @@ export interface DataSource {
   recordPayment(payment: NewPayment): Promise<void>;
   /** Appends a reversal entry. Throws PaymentWriteError. */
   reversePayment(reversal: NewReversal): Promise<void>;
+  bookSettings(): Promise<BookSettings>;
+  /** Sets the payday and base salary of the active book. Idempotent. Throws SettingsWriteError. */
+  updateBookSettings(update: BookSettingsUpdate): Promise<void>;
 }

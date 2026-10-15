@@ -9,7 +9,8 @@ import { z } from 'zod';
 import { bookSchema, pickActiveBook } from './book';
 import raw from './fixtures.generated.json';
 import { mapInstallmentRow } from './mappers';
-import { cycleSummarySchema, debtMetaSchema, debtRowSchema, fixtureSchema, paymentRowSchema } from './schemas';
+import { createFixtureSource } from './fixtureSource';
+import { bookSettingsRowSchema, cycleSummarySchema, debtMetaSchema, debtRowSchema, fixtureSchema, paymentRowSchema } from './schemas';
 import { COLUMNS } from './supabaseSource';
 
 const fx = fixtureSchema.parse(raw);
@@ -74,6 +75,15 @@ describe('buku', () => {
   it('orang asing tidak mendapat buku apa pun (RLS) → null', async () => {
     const rows = await rowsAs(STRANGER, `select ${COLUMNS.book} from books where archived_at is null`);
     expect(pickActiveBook(z.array(bookSchema).parse(rows))).toBeNull();
+  });
+
+  it('pengaturan gajian lolos bookSettingsRowSchema dan sama dengan yang ditampilkan mode contoh', async () => {
+    const [row] = z.array(bookSettingsRowSchema).parse(await rowsAs(OWNER, `select ${COLUMNS.bookSettings} from books where id = $1`, [BOOK]));
+    expect(await createFixtureSource().bookSettings()).toEqual({
+      name: row?.name,
+      paydayDay: row?.payday_day,
+      baseSalaryIdr: row?.base_salary_idr,
+    });
   });
 });
 

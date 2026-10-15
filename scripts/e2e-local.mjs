@@ -214,6 +214,37 @@ async function main() {
       assert.ok(!(await page.locator('body').innerText()).includes('Utang Telat E2E'), 'utang lunas tidak lagi di Perlu dibayar');
     });
 
+    await step('Gajian: tanggal di luar 1–28 ditolak di klien; simpan mengubah buku dan kartu siklus Beranda', async () => {
+      const bookRow = async () => {
+        const { data, error } = await owner.from('books').select('payday_day, base_salary_idr').single();
+        if (error) throw new Error(error.message);
+        return data;
+      };
+      await page.goto(`${BASE}/pengaturan`);
+      const gajian = page.getByRole('list', { name: 'Gajian' });
+      await gajian.getByText('Tanggal 1', { exact: true }).waitFor();
+      await gajian.getByText('Rp9.500.000', { exact: true }).waitFor();
+      await page.getByRole('link', { name: /Tanggal gajian/ }).click();
+      await page.getByRole('heading', { name: 'Gajian', level: 1 }).waitFor();
+
+      await page.getByLabel('Tanggal gajian').fill('29');
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByText('Isi tanggal antara 1 dan 28.').waitFor();
+      assert.deepEqual(await bookRow(), { payday_day: 1, base_salary_idr: 9_500_000 });
+
+      await page.getByLabel('Tanggal gajian').fill('25');
+      await page.getByLabel('Gaji pokok bulanan (opsional)').fill('');
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByRole('heading', { name: 'Pengaturan' }).waitFor();
+      await gajian.getByText('Tanggal 25', { exact: true }).waitFor();
+      await gajian.getByText('Belum diisi', { exact: true }).waitFor();
+      assert.deepEqual(await bookRow(), { payday_day: 25, base_salary_idr: null });
+
+      await page.goto(BASE + '/');
+      await page.getByText('Kewajiban siklus').waitFor();
+      assert.ok(!(await page.locator('body').innerText()).includes('Sisa kas setelah cicilan'));
+    });
+
     await step('Pengaturan menampilkan email; Keluar menghapus sesi dan kembali ke /masuk', async () => {
       await page.goto(`${BASE}/pengaturan`);
       await page.getByText(email).waitFor();

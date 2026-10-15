@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDataSource } from './context';
 import { PaymentWriteError } from './paymentErrors';
-import type { NewPayment, NewReversal } from './source';
+import { SettingsWriteError } from './settingsErrors';
+import type { BookSettingsUpdate, NewPayment, NewReversal } from './source';
 
 // Query keys always start with the book id: another book's data is never reused from the cache.
 
@@ -39,8 +40,8 @@ export function useInboxCount() {
  * the connection returns. That is exactly the hidden queue we do not want, so ledger mutations use 'always'
  * (found by scripts/e2e-local.mjs: the offline tap stayed on "Menyimpan…" and would have been sent later).
  */
-function assertOnline() {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) throw new PaymentWriteError('offline');
+function assertOnline(offline: () => Error) {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) throw offline();
 }
 
 /**
@@ -53,7 +54,7 @@ export function useRecordPayment() {
   return useMutation({
     networkMode: 'always',
     mutationFn: async (payment: NewPayment) => {
-      assertOnline();
+      assertOnline(() => new PaymentWriteError('offline'));
       await source.recordPayment(payment);
     },
     onSettled: () => client.invalidateQueries({ queryKey: [source.bookId] }),
@@ -66,8 +67,27 @@ export function useReversePayment() {
   return useMutation({
     networkMode: 'always',
     mutationFn: async (reversal: NewReversal) => {
-      assertOnline();
+      assertOnline(() => new PaymentWriteError('offline'));
       await source.reversePayment(reversal);
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: [source.bookId] }),
+  });
+}
+
+export function useBookSettings() {
+  const source = useDataSource();
+  return useQuery({ queryKey: [source.bookId, 'book-settings'], queryFn: () => source.bookSettings(), retry: false });
+}
+
+/** Payday and salary change the cycle card, so everything for this book is refetched afterwards. */
+export function useUpdateBookSettings() {
+  const source = useDataSource();
+  const client = useQueryClient();
+  return useMutation({
+    networkMode: 'always',
+    mutationFn: async (update: BookSettingsUpdate) => {
+      assertOnline(() => new SettingsWriteError('offline'));
+      await source.updateBookSettings(update);
     },
     onSettled: () => client.invalidateQueries({ queryKey: [source.bookId] }),
   });

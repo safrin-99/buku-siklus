@@ -1,12 +1,43 @@
 import { useState } from 'react';
 import { AUTH_MESSAGES, AuthFailure } from '../auth/authErrors';
 import { useAuth } from '../auth/AuthProvider';
+import { LedgerList } from '../components/DebtRows';
 import { ScreenHeader } from '../components/layout/ScreenHeader';
 import { Button } from '../components/ui/Button';
 import { FormAlert } from '../components/ui/FormAlert';
 import { SectionTitle } from '../components/ui/SectionTitle';
+import { SettingRow } from '../components/ui/SettingRow';
+import { ErrorState, LoadingRegion, Skeleton } from '../components/ui/States';
+import { useBookSettings } from '../data/hooks';
+import { formatRupiah } from '../lib/money';
 
-/** Only the Account section is built so far (DESIGN.md section 7.7); the rest is stated honestly below. */
+/** Payday and salary of the active book; each row opens its own form. */
+function GajianSection() {
+  const query = useBookSettings();
+  return (
+    <section aria-label="Gajian">
+      <SectionTitle>Gajian</SectionTitle>
+      {query.isError ? (
+        <ErrorState title="Data tidak bisa dimuat." hint="Periksa koneksi, lalu coba lagi." onRetry={() => void query.refetch()} />
+      ) : query.data ? (
+        <LedgerList label="Gajian">
+          <SettingRow to="/pengaturan/gajian" label="Tanggal gajian" value={`Tanggal ${query.data.paydayDay}`} />
+          <SettingRow
+            to="/pengaturan/gajian"
+            label="Gaji pokok bulanan"
+            value={query.data.baseSalaryIdr === null ? 'Belum diisi' : formatRupiah(query.data.baseSalaryIdr)}
+          />
+        </LedgerList>
+      ) : (
+        <LoadingRegion>
+          <Skeleton className="h-28" />
+        </LoadingRegion>
+      )}
+    </section>
+  );
+}
+
+/** Account and Gajian are built so far (DESIGN.md section 7.7); the rest is stated honestly below. */
 export function Pengaturan() {
   const { state, signOut } = useAuth();
   const [confirmGlobal, setConfirmGlobal] = useState(false);
@@ -62,6 +93,7 @@ export function Pengaturan() {
             )}
           </div>
         </section>
+        <GajianSection />
         <p className="text-caption text-ink-2">Pengaturan lain belum dibangun.</p>
       </div>
     </>

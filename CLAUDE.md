@@ -33,18 +33,18 @@ src/
   lib/{money,dates,status,derive,cx,config,env,supabase}.ts
   data/                  # DataSource, konteks, skema Zod, fixture hasil SQL
   integration/           # uji terhadap Supabase LOKAL sungguhan (*.local.test.ts; pnpm test:local)
-  pages/                 # layar (Beranda, Catatan, Detail, Masuk, Pengaturan, Placeholder)
+  pages/                 # layar (Beranda, Catatan, Detail, Masuk, Pengaturan, Gajian, Placeholder)
   components/{ui,layout}/  # komponen sesuai DESIGN.md
 scripts/                 # gen-fixtures.mjs, audit-ui.mjs, e2e-local.mjs, lib/browser.mjs (pembantu bersama)
 ```
 
 ## Perintah
 
-- `pnpm dev`, `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test` (vitest, 113 tes termasuk uji kontrak SQL → Zod)
+- `pnpm dev`, `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test` (vitest, 118 tes termasuk uji kontrak SQL → Zod)
 - Env (`.env.local`, lihat `.env.example`): `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (hanya kunci publishable/anon). Build produksi **gagal** bila env kosong atau berisi kunci rahasia (`sb_secret_`/`service_role`). Data contoh hanya lewat `pnpm dev:fixture` (`--mode fixture`); build biasa tidak memuatnya.
 - `pnpm test:db` (17 tes skema + RLS + ledger + fixture tidak basi, PGlite, ±50 detik)
-- `pnpm test:local` (32 tes integrasi ke Supabase lokal sungguhan: GoTrue + PostgREST + RLS lewat HTTP, termasuk tulis ledger dengan gangguan jaringan yang disuntikkan; butuh Docker dan `supabase start`; menolak URL non-lokal karena ledger tidak bisa dihapus)
-- `pnpm e2e:local` (12 langkah di Chromium asli terhadap stack lokal, dicek silang ke database: login, data, sesi bertahan setelah reload, Catat pembayaran (klik ganda = satu baris), offline ditolak, pembatalan dengan entri pembalik, pelunasan, Keluar, Keluar dari semua perangkat; membangun sendiri ke `dist-e2e/`)
+- `pnpm test:local` (39 tes integrasi ke Supabase lokal sungguhan: GoTrue + PostgREST + RLS lewat HTTP, termasuk tulis ledger dengan gangguan jaringan yang disuntikkan; butuh Docker dan `supabase start`; menolak URL non-lokal karena ledger tidak bisa dihapus)
+- `pnpm e2e:local` (13 langkah di Chromium asli terhadap stack lokal, dicek silang ke database: login, data, sesi bertahan setelah reload, Catat pembayaran (klik ganda = satu baris), offline ditolak, pembatalan dengan entri pembalik, pelunasan, Gajian, Keluar, Keluar dari semua perangkat; membangun sendiri ke `dist-e2e/`)
 - `pnpm gen:fixtures` membangkitkan ulang `src/data/fixtures.generated.json` dari SQL asli. Wajib dijalankan setelah migrasi atau `seed.sql` berubah; `test:db` gagal bila lupa.
 - `pnpm audit:ui` (membangun sendiri dalam mode fixture ke `dist-fixture/`): membuka build di Chromium 360px dan 412px, memeriksa overflow, teks < 12px, kontras, target < 44px, nama aksesibel, emoji, angka tabular, termasuk keadaan setelah interaksi; tangkapan layar ke `audit-out/`. Simulasi state: `?fixture=loading|slow|error|empty|signedout`.
 - `supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor,mailpit` (hanya db, gateway, auth, REST; cukup untuk `test:local`), `supabase db reset`. Migrasi + seed sudah terbukti lolos di Postgres Supabase lokal; `supabase functions serve` belum dijalankan.
@@ -52,8 +52,8 @@ scripts/                 # gen-fixtures.mjs, audit-ui.mjs, e2e-local.mjs, lib/br
 
 ## Status implementasi
 
-Sudah: skema + RLS + seed (teruji di PGlite dan Postgres Supabase lokal), lapisan data (DataSource: fixture dari SQL dan Supabase), komponen UI, layar Beranda, Catatan, Detail, login pemilik (email + kata sandi), layar Masuk, Pengaturan bagian Akun (Keluar, Keluar dari semua perangkat), Catat pembayaran dan pembatalan lewat entri pembalik. Jalur baca dan tulis Supabase teruji end-to-end di browser terhadap stack lokal (belum terhadap proyek asli).
-Belum: Catatan baru (Tambah catatan), memo yang bisa diedit, foto bukti pembayaran (`proof_path`, butuh bucket Storage), tombol `Ingatkan lewat WhatsApp`, Kotak Masuk, Kalender, Pengaturan (selain Akun), RPC `create_debt`, Edge Function, PWA, pemilih buku. Rute belum dibangun menampilkan `Placeholder` yang jujur.
+Sudah: skema + RLS + seed (teruji di PGlite dan Postgres Supabase lokal), lapisan data (DataSource: fixture dari SQL dan Supabase), komponen UI, layar Beranda, Catatan, Detail, login pemilik (email + kata sandi), layar Masuk, Pengaturan bagian Akun (Keluar, Keluar dari semua perangkat) dan Gajian (tanggal gajian, gaji pokok), Catat pembayaran dan pembatalan lewat entri pembalik. Jalur baca dan tulis Supabase teruji end-to-end di browser terhadap stack lokal (belum terhadap proyek asli).
+Belum: Catatan baru (Tambah catatan), memo yang bisa diedit, foto bukti pembayaran (`proof_path`, butuh bucket Storage), tombol `Ingatkan lewat WhatsApp`, Kotak Masuk, Kalender, Pengaturan (selain Akun dan Gajian; opsi geser ke hari kerja belum), RPC `create_debt`, Edge Function, PWA, pemilih buku. Rute belum dibangun menampilkan `Placeholder` yang jujur.
 
 ## Model data: buku (keputusan)
 

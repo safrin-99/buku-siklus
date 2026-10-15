@@ -33,6 +33,11 @@ const ROUTES = [
   '/catatan/tidak-ada',
   '/masuk?fixture=signedout',
   '/pengaturan',
+  '/pengaturan?fixture=loading',
+  '/pengaturan?fixture=error',
+  '/pengaturan/gajian',
+  '/pengaturan/gajian?fixture=loading',
+  '/pengaturan/gajian?fixture=error',
   `/catatan/${HENDRA}/bayar`,
   `/catatan/${HENDRA}/bayar?fixture=error`,
   `/catatan/${ARISAN}/bayar`,
@@ -108,6 +113,29 @@ const INTERACTIONS = [
       yield 'konfirmasi-keluar-semua';
       await page.getByRole('button', { name: 'Keluar dari semua perangkat' }).click();
       await page.getByText('Mode contoh: tindakan ini tidak tersedia.').waitFor();
+      yield 'galat';
+    },
+  },
+  {
+    route: '/pengaturan/gajian',
+    name: 'gajian',
+    run: async function* (page) {
+      const payday = page.getByLabel('Tanggal gajian');
+      const salary = page.getByLabel('Gaji pokok bulanan (opsional)');
+      assert.equal(await payday.inputValue(), '1', 'tanggal gajian terisi dari buku');
+      assert.equal(await salary.inputValue(), '9.500.000', 'gaji pokok terisi dari buku');
+      await salary.fill('0');
+      assert.equal(await salary.inputValue(), '', 'Rp0 tidak bisa diketik: kolom kosong berarti tidak dipakai');
+      await payday.fill('29');
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByText('Isi tanggal antara 1 dan 28.').waitFor();
+      yield 'validasi';
+      await payday.fill('25');
+      await salary.fill('');
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByText('Menyimpan…').waitFor();
+      yield 'menyimpan';
+      await page.getByText('Mode contoh: perubahan tidak disimpan.').waitFor();
       yield 'galat';
     },
   },
