@@ -2,7 +2,7 @@ import { CircleAlert } from 'lucide-react';
 import { useId, type InputHTMLAttributes, type ReactNode } from 'react';
 import { cx } from '../../lib/cx';
 
-interface Props extends Omit<InputHTMLAttributes<HTMLInputElement>, 'className'> {
+export interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'className'> {
   label: string;
   /** Error message for this field. Red is reserved for "overdue", so errors use an icon, bold text and a dark border. */
   error?: string | undefined;
@@ -14,7 +14,7 @@ interface Props extends Omit<InputHTMLAttributes<HTMLInputElement>, 'className'>
 }
 
 /** Text field: label on top, 52px tall, radius 12, 1.5px border (DESIGN.md section 6). */
-export function TextField({ label, error, hint, prefix, trailing, id, ...input }: Props) {
+export function TextField({ label, error, hint, prefix, trailing, id, ...input }: TextFieldProps) {
   const autoId = useId();
   const inputId = id ?? autoId;
   const describedBy = [error ? `${inputId}-error` : '', hint ? `${inputId}-hint` : ''].filter(Boolean).join(' ');

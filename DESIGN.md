@@ -231,6 +231,13 @@ Penambahan saat membangun login (15 Okt 2026, diverifikasi di 360px dan 412px):
 16. **Layar Masuk** (di luar tujuh layar utama): satu kartu form berisi `Email`, `Kata sandi` (dengan tombol tampilkan/sembunyikan berukuran ketuk 48px), dan tombol primer `Masuk`. Tanpa pendaftaran dan tanpa "lupa kata sandi": akun dikelola lewat dashboard Supabase. Galat tampil sebagai kotak netral dengan ikon, bukan merah (merah hanya untuk "terlambat"); pesan untuk email salah dan kata sandi salah sama persis. State: normal, memproses (`Memproses…`), galat. State kosong tidak berlaku.
 17. **Kolom isian dan galat formulir.** Galat per kolom memakai garis tepi `ink`, ikon, dan teks tebal, bukan warna merah, supaya aturan "warna berarti status" tetap utuh.
 
+Penambahan saat membangun Catat pembayaran (15 Okt 2026, diverifikasi di 360px dan 412px):
+
+18. **Catat pembayaran** adalah layar (rute `/catatan/:id/bayar`), bukan bottom sheet, supaya tombol Kembali Android bekerja. Isi: nama catatan + `Sisa …` (satu kali), `Nominal dibayar`/`Nominal diterima` (awalan `Rp` terkunci, pemisah ribuan otomatis, terisi sebesar tagihan berikutnya), `Tanggal bayar`/`Tanggal terima` (bawaan hari ini, tidak boleh setelah hari ini), `Referensi (opsional)`, `Catatan (opsional)`, tombol `Simpan`. Tanpa pratinjau "sisa setelah ini" karena sisa dihitung SQL. State: normal, menyimpan, galat (per kolom dan per formulir), memuat, tidak ditemukan, sudah lunas.
+19. **Riwayat pembayaran di Detail**: tiap baris pembayaran bisa diketuk (ikon panah netral di kanan) dan membuka layar `Pembayaran`. Baris yang sudah dibatalkan berlabel `Dibatalkan` dengan nominal netral (bukan hijau); entri pembalik berlabel `Dikoreksi`. Tombol primer `Catat pembayaran` di bawah Memo, hanya bila sisa > 0.
+20. **Layar Pembayaran** (rute `/catatan/:id/pembayaran/:pid`): rincian entri; bila bisa dibatalkan, kolom `Alasan (opsional)` dan tombol destruktif `Batalkan pembayaran` dengan konfirmasi yang menyebut entri pembalik (`Dicatat entri pembalik −Rp450.000 bertanggal 15 Okt. Pembayaran asli tetap tampil di riwayat.`) dan tombol `Batal`. Tidak ada edit atau hapus. Koreksi nominal = batalkan lalu catat baru.
+21. **Hasil "belum pasti tersimpan"** (koneksi putus dan pemeriksaan gagal): kolom dikunci, tombol menjadi `Kirim ulang` (id yang sama, aman) dan muncul `Lihat riwayat`. Offline: penulisan ditolak dengan pesan, tidak diantre.
+
 ## 12. Buku (celah desain, belum divisualkan Stitch)
 
 Aplikasi mendukung lebih dari satu **buku** (mis. "Buku Saya", "Buku Pacar"). Enam layar terkunci hanya menggambar satu buku, jadi dua elemen berikut ditambahkan dan dibangun dari komponen di bagian 6, bukan dari Stitch:

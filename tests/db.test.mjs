@@ -144,6 +144,48 @@ test('ledger: pembayaran melebihi total ditolak; pembayaran sebagian menghitung 
   assert.equal(s.total_owed_remaining_idr, 550000);
 });
 
+test('ledger: kirim ulang dengan id yang sama setelah pelunasan DITOLAK walau barisnya sudah ada (alasan klien memeriksa id)', async () => {
+  const db = await fresh();
+  const id = '30000000-0000-4000-8000-000000000001';
+  const insert = () => db.query(`insert into payments (id, debt_id, book_id, paid_on, amount_idr, created_by)
+      values ($1, $2, $3, '2026-10-15', 350000, $4)`, [id, REZA, BOOK, A]);
+  await insert();
+  // Trigger BEFORE INSERT berjalan sebelum pemeriksaan kunci: pesan "melebihi total" menyesatkan, bukan "duplikat".
+  await rejects(insert(), /melebihi total/);
+  await rejects(db.query(`insert into payments (id, debt_id, book_id, paid_on, amount_idr, created_by)
+      values ($1, $2, $3, '2026-10-15', 350000, $4) on conflict (id) do nothing`, [id, REZA, BOOK, A]), /melebihi total/);
+  const rows = await q(db, `select id from payments where id = $1`, [id]);
+  assert.equal(rows.length, 1);
+});
+
+test('ledger: pembayaran menaikkan "terbayar" siklus dan pembaliknya menurunkannya kembali', async () => {
+  const db = await fresh();
+  const cycle = async () => (await q(db, `select paid_idr, unpaid_idr from cycle_summary($1, '2026-10-15')`, [BOOK]))[0];
+  assert.deepEqual(await cycle(), { paid_idr: 500000, unpaid_idr: 2000000 });
+
+  const pay = '30000000-0000-4000-8000-000000000002';
+  await db.query(`insert into payments (id, debt_id, book_id, paid_on, amount_idr, created_by) values ($1, $2, $3, '2026-10-15', 600000, $4)`, [pay, LAPTOP, BOOK, A]);
+  assert.deepEqual(await cycle(), { paid_idr: 1100000, unpaid_idr: 1400000 });
+
+  await db.query(`insert into payments (debt_id, book_id, paid_on, amount_idr, reverses_payment_id, created_by) values ($1, $2, '2026-10-15', -600000, $3, $4)`, [LAPTOP, BOOK, pay, A]);
+  assert.deepEqual(await cycle(), { paid_idr: 500000, unpaid_idr: 2000000 });
+  const [l] = await q(db, `select status, next_due_seq, remaining_idr from debt_list($1, '2026-10-15') where debt_id = $2`, [BOOK, LAPTOP]);
+  assert.deepEqual([l.status, l.next_due_seq, l.remaining_idr], ['active', 4, 5400000]);
+});
+
+test('ledger: entri pembalik tidak bisa dibalik; pembalik kedua atas pembayaran tunggal ditolak', async () => {
+  const db = await fresh();
+  const [orig] = await q(db, `select id from payments where debt_id = $1`, [ARISAN]);
+  const rev = '30000000-0000-4000-8000-000000000003';
+  await db.query(`insert into payments (id, debt_id, book_id, paid_on, amount_idr, reverses_payment_id, created_by)
+      values ($1, $2, $3, '2026-10-15', -500000, $4, $5)`, [rev, ARISAN, BOOK, orig.id, A]);
+  await rejects(db.query(`insert into payments (debt_id, book_id, paid_on, amount_idr, reverses_payment_id, created_by)
+      values ($1, $2, '2026-10-15', 500000, $3, $4)`, [ARISAN, BOOK, rev, A]), /check|persis negatif/i);
+  // Pembalik kedua (id lain) ditolak sebelum mencapai indeks unik: total pembayaran akan negatif.
+  await rejects(db.query(`insert into payments (debt_id, book_id, paid_on, amount_idr, reverses_payment_id, created_by)
+      values ($1, $2, '2026-10-15', -500000, $3, $4)`, [ARISAN, BOOK, orig.id, A]), /tidak boleh negatif|duplicate|unique/i);
+});
+
 test('integritas: pembayaran lintas buku ditolak (FK komposit)', async () => {
   const db = await fresh();
   await db.query(`insert into books (id, name, owner_id) values ('10000000-0000-4000-8000-000000000002', 'Buku Pacar', $1)`, [A]);

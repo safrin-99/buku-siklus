@@ -40,6 +40,11 @@ export function appClient(stack: LocalStack, url: string = stack.apiUrl): Supaba
   return createClient(url, stack.publishableKey, noSession);
 }
 
+/** App client whose HTTP layer is wrapped, to inject faults such as a lost response (see payments.local.test.ts). */
+export function appClientWithFetch(stack: LocalStack, wrap: (real: typeof fetch) => typeof fetch): SupabaseClient {
+  return createClient(stack.apiUrl, stack.publishableKey, { ...noSession, global: { fetch: wrap(fetch) } });
+}
+
 /** Admin client (only for preparing test accounts; never present in the app). */
 export function adminClient(stack: LocalStack): SupabaseClient {
   return createClient(stack.apiUrl, stack.adminKey, noSession);

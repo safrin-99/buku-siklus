@@ -121,3 +121,13 @@ export function labelPayments(
   }
   return labels;
 }
+
+/** Ids of payments that another ledger entry reverses. */
+export function reversedPaymentIds(payments: readonly PaymentRow[]): Set<string> {
+  return new Set(payments.flatMap((p) => (p.reverses_payment_id ? [p.reverses_payment_id] : [])));
+}
+
+/** Only a positive entry that has not been reversed yet can be cancelled; a reversal entry itself never can. */
+export function canReverse(payment: PaymentRow, reversed: ReadonlySet<string>): boolean {
+  return payment.amount_idr > 0 && payment.reverses_payment_id === null && !reversed.has(payment.id);
+}

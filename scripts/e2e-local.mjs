@@ -60,12 +60,18 @@ async function seed(stack) {
       .insert({ debt_id: debt.id, book_id: book.id, seq: 1, due_date: shift(todayMakassar(), -4), amount_idr: 600_000 })
       .select('id'),
   );
-  return { email, debtId: debt.id };
+  return { email, debtId: debt.id, owner };
 }
 
 async function main() {
   const stack = readStack();
-  const { email, debtId } = await seed(stack);
+  const { email, debtId, owner } = await seed(stack);
+  // Ground truth for the payment steps: read the ledger straight from the database, not from the UI.
+  const ledger = async () => {
+    const { data, error } = await owner.from('payments').select('amount_idr, reverses_payment_id, reference, note').eq('debt_id', debtId).order('created_at');
+    if (error) throw new Error(error.message);
+    return data;
+  };
 
   // Real build (not fixture mode) pointed at the local stack.
   execFileSync('pnpm', ['exec', 'vite', 'build', '--outDir', OUT_DIR], {
@@ -135,6 +141,79 @@ async function main() {
       await page.getByText('Catatan tidak ditemukan.').waitFor();
     });
 
+    await step('Catat pembayaran: validasi sisa, lalu klik ganda Simpan hanya mencatat SATU pembayaran', async () => {
+      await page.goto(`${BASE}/catatan/${debtId}`);
+      await page.getByRole('link', { name: 'Catat pembayaran' }).click();
+      await page.getByRole('heading', { name: 'Catat pembayaran' }).waitFor();
+      const amount = page.getByLabel('Nominal dibayar');
+      assert.equal(await amount.inputValue(), '600.000');
+      await amount.fill('700000');
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByText('Nominal melebihi sisa (Rp600.000).').waitFor();
+      assert.deepEqual(await ledger(), []);
+
+      await amount.fill('250000');
+      await page.getByLabel('Referensi (opsional)').fill('E2E-REF');
+      await page.getByRole('button', { name: 'Simpan' }).dblclick();
+      await page.getByRole('heading', { name: 'Detail catatan' }).waitFor();
+      await page.getByText('Ref: E2E-REF').waitFor();
+      assert.deepEqual(await ledger(), [{ amount_idr: 250_000, reverses_payment_id: null, reference: 'E2E-REF', note: null }]);
+    });
+
+    await step('Offline: Simpan ditolak di klien dan tidak ada yang terkirim', async () => {
+      await page.getByRole('link', { name: 'Catat pembayaran' }).click();
+      await page.getByRole('heading', { name: 'Catat pembayaran' }).waitFor();
+      await ctx.setOffline(true);
+      await page.getByLabel('Nominal dibayar').fill('10000');
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByText('Kamu sedang offline. Perubahan belum bisa dicatat.').waitFor();
+      await ctx.setOffline(false);
+      assert.equal((await ledger()).length, 1);
+    });
+
+    await step('Batalkan pembayaran: entri pembalik negatif, baris asli tetap ada dan bertanda Dibatalkan', async () => {
+      await page.goto(`${BASE}/catatan/${debtId}`);
+      await page.getByRole('link', { name: /Pembayaran sebagian/ }).click();
+      await page.getByRole('heading', { name: 'Pembayaran', exact: true }).waitFor();
+      await page.getByLabel('Alasan (opsional)').fill('salah nominal');
+      await page.getByRole('button', { name: 'Batalkan pembayaran' }).click();
+      await page.getByRole('button', { name: 'Ya, batalkan pembayaran' }).click();
+      await page.getByRole('heading', { name: 'Detail catatan' }).waitFor();
+      await page.getByText('Dibatalkan', { exact: true }).waitFor();
+      await page.getByText('Dikoreksi', { exact: true }).waitFor();
+      const rows = await ledger();
+      assert.equal(rows.length, 2);
+      assert.deepEqual(rows.map((r) => r.amount_idr), [250_000, -250_000]);
+      assert.equal(rows[1].note, 'salah nominal');
+      assert.ok(rows[1].reverses_payment_id, 'pembalik menunjuk pembayaran asal');
+    });
+
+    await step('Yang sudah dibatalkan dan entri pembalik tidak menawarkan pembatalan lagi', async () => {
+      await page.getByRole('link', { name: /Pembayaran sebagian/ }).click();
+      await page.getByText('Pembayaran ini sudah dibatalkan pada').waitFor();
+      assert.equal(await page.getByRole('button', { name: 'Batalkan pembayaran' }).count(), 0);
+      await page.goto(`${BASE}/catatan/${debtId}`);
+      await page.getByRole('link', { name: /Pembalikan/ }).click();
+      await page.getByText('Entri pembalik tidak bisa dibatalkan.').waitFor();
+      assert.equal(await page.getByRole('button', { name: 'Batalkan pembayaran' }).count(), 0);
+    });
+
+    await step('Pelunasan: status Lunas, tombol Catat pembayaran hilang, Beranda ikut berubah', async () => {
+      await page.goto(`${BASE}/catatan/${debtId}`);
+      await page.getByRole('link', { name: 'Catat pembayaran' }).click();
+      assert.equal(await page.getByLabel('Nominal dibayar').inputValue(), '600.000');
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByRole('heading', { name: 'Detail catatan' }).waitFor();
+      await page.getByText('Lunas', { exact: true }).first().waitFor();
+      assert.equal(await page.getByRole('link', { name: 'Catat pembayaran' }).count(), 0);
+      assert.equal((await ledger()).reduce((sum, r) => sum + r.amount_idr, 0), 600_000);
+
+      await page.goto(BASE + '/');
+      await page.getByRole('heading', { name: 'Beranda' }).waitFor();
+      await page.getByText('Total utang').waitFor();
+      assert.ok(!(await page.locator('body').innerText()).includes('Utang Telat E2E'), 'utang lunas tidak lagi di Perlu dibayar');
+    });
+
     await step('Pengaturan menampilkan email; Keluar menghapus sesi dan kembali ke /masuk', async () => {
       await page.goto(`${BASE}/pengaturan`);
       await page.getByText(email).waitFor();
@@ -148,7 +227,7 @@ async function main() {
 
     await step('Keluar dari semua perangkat: konfirmasi dulu, lalu sesi hilang', async () => {
       await login(PASSWORD);
-      await page.getByText('Utang Telat E2E').waitFor();
+      await page.getByRole('heading', { name: 'Beranda' }).waitFor(); // the debt is settled by now, so it is not listed
       await page.goto(`${BASE}/pengaturan`);
       await page.getByRole('button', { name: 'Keluar dari semua perangkat' }).click();
       await page.getByText('Semua perangkat yang masuk dengan akun ini akan keluar').waitFor();

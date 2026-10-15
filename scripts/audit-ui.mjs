@@ -2,13 +2,18 @@
 // memeriksa aturan DESIGN.md yang bisa diukur mesin, dan menyimpan tangkapan layar ke audit-out/.
 // Pakai: pnpm audit:ui   (membangun sendiri dalam mode fixture; CHROMIUM_PATH opsional)
 import { spawn } from 'node:child_process';
-import { mkdirSync, rmSync } from 'node:fs';
+import assert from 'node:assert/strict';
+import { mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { chromium } from 'playwright-core';
 import { findChromium, waitForServer } from './lib/browser.mjs';
 
 const PORT = 4173;
 const BASE = `http://127.0.0.1:${PORT}`;
 const HENDRA = '20000000-0000-4000-8000-000000000001';
+const ARISAN = '20000000-0000-4000-8000-000000000004';
+// Fixture payment ids are synthetic (pay-N); pick Hendra's first real payment for the payment detail screen.
+const fixture = JSON.parse(readFileSync(new URL('../src/data/fixtures.generated.json', import.meta.url), 'utf8'));
+const HENDRA_PAYMENT = fixture.payments.find((p) => p.debt_id === HENDRA && p.amount_idr > 0).id;
 const WIDTHS = [360, 412];
 const OUT = 'audit-out';
 
@@ -28,6 +33,12 @@ const ROUTES = [
   '/catatan/tidak-ada',
   '/masuk?fixture=signedout',
   '/pengaturan',
+  `/catatan/${HENDRA}/bayar`,
+  `/catatan/${HENDRA}/bayar?fixture=error`,
+  `/catatan/${ARISAN}/bayar`,
+  '/catatan/tidak-ada/bayar',
+  `/catatan/${HENDRA}/pembayaran/${HENDRA_PAYMENT}`,
+  `/catatan/${HENDRA}/pembayaran/tidak-ada`,
 ];
 
 // Keadaan yang hanya muncul setelah interaksi. Tiap langkah mengembalikan nama keadaan untuk diperiksa.
@@ -44,6 +55,48 @@ const INTERACTIONS = [
       await page.getByText('Memproses…').waitFor();
       yield 'memproses';
       await page.getByText('Mode contoh: tindakan ini tidak tersedia.').waitFor();
+      yield 'galat';
+    },
+  },
+  {
+    route: `/catatan/${HENDRA}/bayar`,
+    name: 'bayar',
+    run: async function* (page) {
+      const amount = page.getByLabel('Nominal dibayar');
+      assert.equal(await amount.inputValue(), '600.000', 'nominal terisi sebesar tagihan berikutnya');
+      await amount.fill('1234567');
+      assert.equal(await amount.inputValue(), '1.234.567', 'pemisah ribuan otomatis saat mengetik');
+      await amount.fill('');
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      yield 'validasi-kosong';
+      await amount.fill('999999');
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByText('Nominal melebihi sisa (Rp600.000).').waitFor();
+      yield 'melebihi-sisa';
+      await page.getByLabel('Tanggal bayar').fill('2026-10-16');
+      await amount.fill('300000');
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByText('Tanggal tidak boleh setelah hari ini.').waitFor();
+      yield 'tanggal-masa-depan';
+      await page.getByLabel('Tanggal bayar').fill('2026-10-15');
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByText('Menyimpan…').waitFor();
+      yield 'menyimpan';
+      await page.getByText('Mode contoh: perubahan tidak disimpan.').waitFor();
+      yield 'galat';
+    },
+  },
+  {
+    route: `/catatan/${HENDRA}/pembayaran/${HENDRA_PAYMENT}`,
+    name: 'pembayaran',
+    run: async function* (page) {
+      await page.getByRole('button', { name: 'Batalkan pembayaran' }).click();
+      await page.getByText('Pembayaran asli tetap tampil di riwayat.').waitFor();
+      yield 'konfirmasi';
+      await page.getByRole('button', { name: 'Ya, batalkan pembayaran' }).click();
+      await page.getByText('Memproses…').waitFor();
+      yield 'memproses';
+      await page.getByText('Mode contoh: perubahan tidak disimpan.').waitFor();
       yield 'galat';
     },
   },

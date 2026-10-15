@@ -4,6 +4,8 @@ import { todayInZone } from '../lib/dates';
 import { bookSchema, isUuid, pickActiveBook, type Book } from './book';
 import { mapInstallmentRow } from './mappers';
 import { cycleSummarySchema, debtMetaSchema, debtRowSchema, paymentRowSchema } from './schemas';
+import { PaymentWriteError } from './paymentErrors';
+import { settleWrite } from './settle';
 import { NotFoundError, type DataSource, type DebtDetail } from './source';
 
 /**
@@ -43,6 +45,21 @@ export function createSupabaseSource(client: SupabaseClient, book: Book): DataSo
   const bookId = book.id;
   // Fail loudly at creation if the book's time zone is not a valid IANA name (the SQL functions would fail too).
   todayInZone(book.timezone);
+
+  // Appends one ledger row. Success is decided by looking the id up, not by the error alone (see settleWrite).
+  const appendToLedger = async (row: { id: string } & Record<string, unknown>): Promise<void> => {
+    const outcome = await settleWrite<PostgrestError>(
+      async () => (await client.from('payments').insert({ ...row, book_id: bookId })).error,
+      async () => {
+        const { data, error } = await client.from('payments').select('id').eq('id', row.id).maybeSingle();
+        if (error) throw error;
+        return data !== null;
+      },
+      // PostgREST/Postgres errors carry a code; a transport failure has an empty one.
+      (error) => !error.code,
+    );
+    if (outcome !== 'saved') throw new PaymentWriteError(outcome);
+  };
 
   // No p_today: SQL uses "today" in the book's time zone.
   const debtList = async (): Promise<unknown> => unwrap(await client.rpc('debt_list', { p_book: bookId }));
@@ -95,6 +112,26 @@ export function createSupabaseSource(client: SupabaseClient, book: Book): DataSo
         installments: unwrap(installmentRes).map(mapInstallmentRow),
       };
     },
+
+    recordPayment: (payment) =>
+      appendToLedger({
+        id: payment.id,
+        debt_id: payment.debtId,
+        paid_on: payment.paidOn,
+        amount_idr: payment.amountIdr,
+        reference: payment.reference,
+        note: payment.note,
+      }),
+
+    reversePayment: (reversal) =>
+      appendToLedger({
+        id: reversal.id,
+        debt_id: reversal.debtId,
+        paid_on: reversal.paidOn,
+        amount_idr: -reversal.amountIdr,
+        reverses_payment_id: reversal.reversesPaymentId,
+        note: reversal.note,
+      }),
 
     async inboxPendingCount() {
       const { count, error } = await client
