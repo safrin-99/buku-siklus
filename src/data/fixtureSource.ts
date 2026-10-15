@@ -43,6 +43,7 @@ function emptyCycle(cycle: CycleSummary): CycleSummary {
 export function createFixtureSource(): DataSource {
   return {
     kind: 'fixture',
+    bookId: fixture.book.id,
     getToday: () => fixture.today,
     cycleSummary: () => gate((mode) => (mode === 'empty' ? emptyCycle(fixture.cycle) : fixture.cycle)),
     debts: () => gate((mode) => (mode === 'empty' ? [] : fixture.debts)),

@@ -1,26 +1,32 @@
 import { useQuery } from '@tanstack/react-query';
-import { dataSource } from './index';
+import { useDataSource } from './context';
+
+// Query keys always start with the book id: another book's data is never reused from the cache.
 
 export function useToday(): string {
-  return dataSource.getToday();
+  return useDataSource().getToday();
 }
 
 export function useCycleSummary() {
-  return useQuery({ queryKey: ['cycle-summary'], queryFn: () => dataSource.cycleSummary() });
+  const source = useDataSource();
+  return useQuery({ queryKey: [source.bookId, 'cycle-summary'], queryFn: () => source.cycleSummary() });
 }
 
 export function useDebts() {
-  return useQuery({ queryKey: ['debts'], queryFn: () => dataSource.debts() });
+  const source = useDataSource();
+  return useQuery({ queryKey: [source.bookId, 'debts'], queryFn: () => source.debts() });
 }
 
 export function useDebtDetail(debtId: string) {
+  const source = useDataSource();
   return useQuery({
-    queryKey: ['debt-detail', debtId],
-    queryFn: () => dataSource.debtDetail(debtId),
+    queryKey: [source.bookId, 'debt-detail', debtId],
+    queryFn: () => source.debtDetail(debtId),
     retry: false,
   });
 }
 
 export function useInboxCount() {
-  return useQuery({ queryKey: ['inbox-count'], queryFn: () => dataSource.inboxPendingCount() });
+  const source = useDataSource();
+  return useQuery({ queryKey: [source.bookId, 'inbox-count'], queryFn: () => source.inboxPendingCount() });
 }

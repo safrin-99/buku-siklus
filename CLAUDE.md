@@ -6,7 +6,7 @@ Sumber kebenaran desain: `DESIGN.md` (token, komponen, layar, data kanonik). Bac
 
 ## Stack (keputusan, jangan diganti tanpa diskusi)
 
-- Frontend: Vite + React + TypeScript (strict), Tailwind v4 (compiled, **bukan CDN**; `@theme` mengosongkan palet bawaan sehingga hanya token DESIGN.md yang ada), TanStack Query, Zod, `lucide-react`, react-router-dom. Font Plus Jakarta Sans via Fontsource (self-host; wajib `tabular-nums` untuk angka karena digit bawaannya proporsional). Pengelola paket: **pnpm**. `react-hook-form` dan `vite-plugin-pwa` **belum dipasang**; tambahkan saat layar form dan PWA dibangun.
+- Frontend: Vite + React + TypeScript (strict), Tailwind v4 (compiled, **bukan CDN**; `@theme` mengosongkan palet bawaan sehingga hanya token DESIGN.md yang ada), TanStack Query, Zod, `lucide-react`, react-router-dom, `@supabase/supabase-js` (sesi + PostgREST; menulis sendiri alur sesi/refresh token berarti lebih banyak kode keamanan). Font Plus Jakarta Sans via Fontsource (self-host; wajib `tabular-nums` untuk angka karena digit bawaannya proporsional). Pengelola paket: **pnpm**. `react-hook-form` dan `vite-plugin-pwa` **belum dipasang**; tambahkan saat layar form dan PWA dibangun.
 - Backend: Supabase (Postgres + RLS, Auth, Storage privat, Edge Functions TypeScript/Deno, `pg_cron` + `pg_net`).
 - AI: Claude API, hanya dari Edge Function. Nama model dari env (`AI_MODEL_TEXT`, `AI_MODEL_VISION`), jangan di-hardcode.
 - Penangkap notifikasi: MacroDroid/Tasker di HP, POST ke Edge Function `ingest-notification`.
@@ -17,7 +17,9 @@ Sumber kebenaran desain: `DESIGN.md` (token, komponen, layar, data kanonik). Bac
 
 ```
 supabase/
+  config.toml            # konfigurasi LOKAL (supabase start); sign-up dimatikan. Bukan sumber kebenaran proyek asli
   migrations/            # SQL berurutan, jangan edit migrasi yang sudah diterapkan
+  scripts/first-book.sql # dijalankan manual SEKALI di SQL Editor untuk membuat buku pertama (bukan migrasi)
   functions/
     ingest-notification/ # webhook dari MacroDroid
     parse-entry/         # teks/foto -> inbox_events (AI)
@@ -26,27 +28,31 @@ supabase/
 tests/
   db.test.mjs            # uji skema + RLS dengan PGlite (node --test)
 src/
-  app/                   # routing, provider
-  lib/{money,dates,status,derive,cx}.ts   # supabase.ts menyusul bersama auth
-  data/                  # DataSource, skema Zod, fixture hasil SQL
-  pages/                 # layar (Beranda, Catatan, Detail, Placeholder)
+  app/                   # routing, guard (RequireAuth), gerbang data (DataGate), galat konfigurasi
+  auth/                  # AuthService (Supabase + fixture), pemetaan galat, AuthProvider
+  lib/{money,dates,status,derive,cx,config,env,supabase}.ts
+  data/                  # DataSource, konteks, skema Zod, fixture hasil SQL
+  integration/           # uji terhadap Supabase LOKAL sungguhan (*.local.test.ts; pnpm test:local)
+  pages/                 # layar (Beranda, Catatan, Detail, Masuk, Pengaturan, Placeholder)
   components/{ui,layout}/  # komponen sesuai DESIGN.md
 scripts/                 # gen-fixtures.mjs, audit-ui.mjs
 ```
 
 ## Perintah
 
-- `pnpm dev`, `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test` (vitest, 50 tes)
+- `pnpm dev`, `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test` (vitest, 68 tes)
+- Env (`.env.local`, lihat `.env.example`): `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (hanya kunci publishable/anon). Build produksi **gagal** bila env kosong atau berisi kunci rahasia (`sb_secret_`/`service_role`). Data contoh hanya lewat `pnpm dev:fixture` (`--mode fixture`); build biasa tidak memuatnya.
 - `pnpm test:db` (14 tes skema + RLS + fixture tidak basi, PGlite, ±40 detik)
+- `pnpm test:local` (uji integrasi ke Supabase lokal sungguhan: GoTrue + PostgREST; butuh Docker dan `supabase start`; menolak URL non-lokal karena ledger tidak bisa dihapus)
 - `pnpm gen:fixtures` membangkitkan ulang `src/data/fixtures.generated.json` dari SQL asli. Wajib dijalankan setelah migrasi atau `seed.sql` berubah; `test:db` gagal bila lupa.
-- `pnpm audit:ui` (setelah `pnpm build`): membuka build di Chromium 360px dan 412px, memeriksa overflow, teks < 12px, kontras, target < 44px, nama aksesibel, emoji, angka tabular; tangkapan layar ke `audit-out/`. Simulasi state: `?fixture=loading|slow|error|empty`.
-- `supabase start`, `supabase db reset`, `supabase functions serve` (belum dijalankan terhadap Supabase asli).
+- `pnpm audit:ui` (membangun sendiri dalam mode fixture ke `dist-fixture/`): membuka build di Chromium 360px dan 412px, memeriksa overflow, teks < 12px, kontras, target < 44px, nama aksesibel, emoji, angka tabular, termasuk keadaan setelah interaksi; tangkapan layar ke `audit-out/`. Simulasi state: `?fixture=loading|slow|error|empty|signedout`.
+- `supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor,mailpit` (hanya db, gateway, auth, REST; cukup untuk `test:local`), `supabase db reset`. Migrasi + seed sudah terbukti lolos di Postgres Supabase lokal; `supabase functions serve` belum dijalankan.
 - Sebelum menyatakan tugas selesai: `pnpm typecheck && pnpm lint && pnpm test && pnpm test:db` harus lulus.
 
 ## Status implementasi
 
-Sudah: skema + RLS + seed (teruji), lapisan data (DataSource + fixture dari SQL), komponen UI, layar Beranda, Catatan, Detail (baca saja).
-Belum: login + sumber data Supabase, Catatan baru (Tambah catatan), Catat pembayaran, Kotak Masuk, Kalender, Pengaturan, RPC `create_debt`, Edge Function, PWA, pemilih buku. Rute belum dibangun menampilkan `Placeholder` yang jujur.
+Sudah: skema + RLS + seed (teruji di PGlite dan Postgres Supabase lokal), lapisan data (DataSource + fixture dari SQL), komponen UI, layar Beranda, Catatan, Detail (baca saja), login pemilik (email + kata sandi; teruji terhadap GoTrue lokal), layar Masuk, Pengaturan bagian Akun (Keluar, Keluar dari semua perangkat).
+Belum: sumber data Supabase (`openDataSource` di mode non-fixture masih melempar galat), Catatan baru (Tambah catatan), Catat pembayaran, Kotak Masuk, Kalender, Pengaturan (selain Akun), RPC `create_debt`, Edge Function, PWA, pemilih buku. Rute belum dibangun menampilkan `Placeholder` yang jujur.
 
 ## Model data: buku (keputusan)
 
@@ -88,7 +94,8 @@ Belum: login + sumber data Supabase, Catatan baru (Tambah catatan), Catat pembay
 - RLS aktif di **semua** tabel sejak migrasi pertama. Kebijakan berbasis keanggotaan buku (`can_read`/`can_write`). Tes RLS ada di `tests/db.test.mjs` (orang asing, `anon`, `viewer`, `editor`) dan harus tetap lulus.
 - Service role key hanya di Edge Function, tidak pernah di klien.
 - **Satu pemilik = matikan pendaftaran publik.** Di Supabase Auth nonaktifkan sign-up setelah akun pemilik dibuat (atau batasi ke satu email). RLS tetap mengisolasi data, tapi pendaftaran terbuka memberi orang asing akun dan beban pada kuota proyek.
-- HP hilang = data keuangan terbuka. Sesi PWA harus bisa dicabut (Supabase: sign out semua sesi) dan layar kunci perangkat aktif. Pertimbangkan kunci aplikasi (PIN/biometrik) setelah v1.
+- HP hilang = data keuangan terbuka. Sesi PWA harus bisa dicabut (Supabase: sign out semua sesi) dan layar kunci perangkat aktif. Pertimbangkan kunci aplikasi (PIN/biometrik) setelah v1. **Batas yang terbukti (uji lokal):** "Keluar dari semua perangkat" mencabut refresh token dan ditolak GoTrue, tetapi token akses yang sudah terbit tetap diterima PostgREST sampai kedaluwarsa. Persingkat `JWT expiry` di dashboard (Authentication > Sessions/JWT) untuk mempersempit jendela itu.
+- Hanya kunci publishable/anon yang boleh ada di env klien (`VITE_*` ditanam ke bundle). `config.ts` menolak `sb_secret_` dan JWT `service_role`, dan `vite build` gagal bila terdeteksi. Cache TanStack dikosongkan saat keluar; sesi tidak dibaca dari URL (`detectSessionInUrl: false`).
 - Webhook `ingest-notification`: verifikasi HMAC-SHA256 (header tanda tangan + timestamp, toleransi ±5 menit), allowlist nama paket aplikasi, kunci idempotensi (hash paket+waktu+teks), batasi laju. Tolak selain itu dengan 401/429, tanpa detail.
 - Bucket Storage untuk foto struk privat; akses lewat signed URL berumur pendek.
 - Jangan mencatat (log) isi notifikasi, nominal, atau nama pihak ke log fungsi.

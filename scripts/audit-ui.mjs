@@ -1,6 +1,6 @@
-// Audit render: membuka build produksi (vite preview) di Chromium pada 360px dan 412px,
+// Audit render: membuka build mode fixture (vite preview, dist-fixture/) di Chromium pada 360px dan 412px,
 // memeriksa aturan DESIGN.md yang bisa diukur mesin, dan menyimpan tangkapan layar ke audit-out/.
-// Pakai: pnpm build && pnpm audit:ui   (CHROMIUM_PATH opsional)
+// Pakai: pnpm audit:ui   (membangun sendiri dalam mode fixture; CHROMIUM_PATH opsional)
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { chromium } from 'playwright-core';
@@ -25,6 +25,38 @@ const ROUTES = [
   '/catatan?fixture=error',
   `/catatan/${HENDRA}?fixture=error`,
   '/catatan/tidak-ada',
+  '/masuk?fixture=signedout',
+  '/pengaturan',
+];
+
+// Keadaan yang hanya muncul setelah interaksi. Tiap langkah mengembalikan nama keadaan untuk diperiksa.
+const INTERACTIONS = [
+  {
+    route: '/masuk?fixture=signedout',
+    name: 'masuk',
+    run: async function* (page) {
+      await page.getByRole('button', { name: 'Masuk', exact: true }).click();
+      yield 'validasi-kosong';
+      await page.getByLabel('Email').fill('pemilik@contoh.id');
+      await page.getByLabel('Kata sandi', { exact: true }).fill('rahasia-contoh');
+      await page.getByRole('button', { name: 'Masuk', exact: true }).click();
+      await page.getByText('Memproses…').waitFor();
+      yield 'memproses';
+      await page.getByText('Mode contoh: tindakan ini tidak tersedia.').waitFor();
+      yield 'galat';
+    },
+  },
+  {
+    route: '/pengaturan',
+    name: 'pengaturan',
+    run: async function* (page) {
+      await page.getByRole('button', { name: 'Keluar dari semua perangkat' }).click();
+      yield 'konfirmasi-keluar-semua';
+      await page.getByRole('button', { name: 'Keluar dari semua perangkat' }).click();
+      await page.getByText('Mode contoh: tindakan ini tidak tersedia.').waitFor();
+      yield 'galat';
+    },
+  },
 ];
 
 function findChromium() {
@@ -180,9 +212,11 @@ async function main() {
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(OUT, { recursive: true });
 
-  const server = spawn('pnpm', ['exec', 'vite', 'preview', '--port', String(PORT), '--strictPort', '--host', '127.0.0.1'], {
-    stdio: 'ignore',
-  });
+  const server = spawn(
+    'pnpm',
+    ['exec', 'vite', 'preview', '--outDir', 'dist-fixture', '--port', String(PORT), '--strictPort', '--host', '127.0.0.1'],
+    { stdio: 'ignore' },
+  );
   const stop = () => server.kill();
   process.on('exit', stop);
 
@@ -196,20 +230,26 @@ async function main() {
       const consoleErrors = [];
       page.on('console', (m) => m.type() === 'error' && consoleErrors.push(m.text()));
       page.on('pageerror', (e) => consoleErrors.push(String(e)));
+      const check = async (label, fileName, expectedNoise) => {
+        const findings = await page.evaluate(inPage);
+        await page.screenshot({ path: `${OUT}/${width}${fileName.replace(/[^a-z0-9]+/gi, '_')}.png`, fullPage: true });
+        const errs = expectedNoise ? [] : consoleErrors;
+        total += findings.length + errs.length;
+        const status = findings.length + errs.length === 0 ? 'OK ' : 'GAGAL';
+        console.log(`${status} ${width}px ${label}`);
+        for (const f of findings) console.log(`     - [${f.rule}] ${f.el} :: ${f.detail}`);
+        for (const e of errs) console.log(`     - [console] ${e}`);
+      };
       for (const route of ROUTES) {
         consoleErrors.length = 0;
         await page.goto(BASE + route, { waitUntil: 'networkidle' });
         await page.waitForTimeout(route.includes('error') ? 1800 : 600); // retry galat ±400ms
-        const findings = await page.evaluate(inPage);
-        const name = `${width}${route.replace(/[^a-z0-9]+/gi, '_')}`;
-        await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true });
-        const expectedNoise = route.includes('error') || route.includes('tidak-ada');
-        const errs = expectedNoise ? [] : consoleErrors;
-        total += findings.length + errs.length;
-        const status = findings.length + errs.length === 0 ? 'OK ' : 'GAGAL';
-        console.log(`${status} ${width}px ${route}`);
-        for (const f of findings) console.log(`     - [${f.rule}] ${f.el} :: ${f.detail}`);
-        for (const e of errs) console.log(`     - [console] ${e}`);
+        await check(route, route, route.includes('error') || route.includes('tidak-ada'));
+      }
+      for (const item of INTERACTIONS) {
+        consoleErrors.length = 0;
+        await page.goto(BASE + item.route, { waitUntil: 'networkidle' });
+        for await (const state of item.run(page)) await check(`${item.route} [${state}]`, `${item.name}_${state}`, false);
       }
       await ctx.close();
     }

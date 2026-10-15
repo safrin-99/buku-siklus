@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import { BottomNav } from './BottomNav';
 import { OfflineBanner } from './OfflineBanner';
 
@@ -21,6 +22,16 @@ export function StackLayout() {
     <div className="mx-auto min-h-dvh max-w-app pb-[calc(2rem+env(safe-area-inset-bottom))]">
       <OfflineBanner />
       <Outlet />
+    </div>
+  );
+}
+
+/** Screens outside the main flow (sign in, session loading, config error): no navigation. */
+export function FullScreen({ children }: { children: ReactNode }) {
+  return (
+    <div className="mx-auto min-h-dvh max-w-app pb-[calc(2rem+env(safe-area-inset-bottom))]">
+      <OfflineBanner />
+      {children}
     </div>
   );
 }

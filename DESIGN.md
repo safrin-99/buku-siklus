@@ -159,7 +159,7 @@ Isi, berurutan: baris kecil `Siklus 1 Okt – 31 Okt`; label `Sisa setelah cicil
 4. **Tambah cepat** (bottom sheet dari FAB): kotak teks dengan placeholder `Contoh: Budi pinjam 500rb, bayar tanggal 1`; tombol `Lampirkan foto struk`; setelah kirim, kartu konfirmasi dengan kolom Jenis, Pihak, Nominal, Jatuh tempo, Kategori. Tombol `Simpan` dan `Ubah manual`. Tanpa dikte suara di v1.
 5. **Kotak Masuk**: daftar notifikasi yang ditangkap dan menunggu konfirmasi. Tiap item: sumber + waktu (`BCA Mobile · hari ini 08:47`), teks notifikasi tersamar, saran pencocokan, tombol `Konfirmasi`, `Ubah`, `Bukan utang`. Item tanpa kecocokan: `Catat sebagai baru` dan `Abaikan`. Layar ini adalah tempat satu-satunya data otomatis masuk ke buku.
 6. **Kalender**: satu bulan (`Oktober 2026`), titik status pada tanggal (terlambat, jatuh tempo, lunas), tanggal gajian ditandai cincin indigo, agenda untuk tanggal terpilih di bawahnya. Empty state hanya muncul bila agenda kosong, tidak pernah bersamaan dengan agenda berisi.
-7. **Pengaturan**: Gajian (tanggal cair, gaji pokok bulanan opsional, opsi `Geser ke hari kerja sebelumnya bila jatuh di akhir pekan`); Pengingat (H-3, H-1, Hari H pukul 07:00 WITA, ringkasan gajian); Saluran (Telegram terhubung/belum, push web); Sumber notifikasi (status penerima: `Terakhir menerima 08:47`, daftar aplikasi yang diizinkan, catatan privasi yang benar); Data (ekspor CSV).
+7. **Pengaturan**: Akun (email pemilik yang masuk, `Keluar`, `Keluar dari semua perangkat` dengan konfirmasi); Gajian (tanggal cair, gaji pokok bulanan opsional, opsi `Geser ke hari kerja sebelumnya bila jatuh di akhir pekan`); Pengingat (H-3, H-1, Hari H pukul 07:00 WITA, ringkasan gajian); Saluran (Telegram terhubung/belum, push web); Sumber notifikasi (status penerima: `Terakhir menerima 08:47`, daftar aplikasi yang diizinkan, catatan privasi yang benar); Data (ekspor CSV).
 
 ## 8. Perilaku dan copy
 
@@ -224,6 +224,12 @@ Penyesuaian saat implementasi (15 Okt 2026, diverifikasi di 360px dan 412px):
 12. Ikon filter pada Catatan tidak dibuat: chip `Semua / Aktif / Terlambat / Lunas` sudah memenuhi fungsinya.
 13. Banner offline: `Kamu sedang offline. Data terakhir ditampilkan.` Tidak ada tombol; banner hilang sendiri saat koneksi kembali.
 14. Baris cicilan terakhir di Detail: judul `Cicilan ke-N`, keterangan `Cicilan terakhir`. Kata `Pelunasan` hanya untuk catatan sekali bayar.
+
+Penambahan saat membangun login (15 Okt 2026, diverifikasi di 360px dan 412px):
+
+15. **Akun di Pengaturan.** Satu-satunya mitigasi "HP hilang" yang disebut CLAUDE.md adalah sesi yang bisa dicabut, jadi `Keluar` dan `Keluar dari semua perangkat` ada di Pengaturan, bagian `Akun`. Yang kedua bertombol destruktif dan meminta konfirmasi satu langkah yang menjelaskan akibatnya. Bagian Pengaturan lain belum dibangun dan dinyatakan jujur di layar (`Pengaturan lain belum dibangun.`).
+16. **Layar Masuk** (di luar tujuh layar utama): satu kartu form berisi `Email`, `Kata sandi` (dengan tombol tampilkan/sembunyikan berukuran ketuk 48px), dan tombol primer `Masuk`. Tanpa pendaftaran dan tanpa "lupa kata sandi": akun dikelola lewat dashboard Supabase. Galat tampil sebagai kotak netral dengan ikon, bukan merah (merah hanya untuk "terlambat"); pesan untuk email salah dan kata sandi salah sama persis. State: normal, memproses (`Memproses…`), galat. State kosong tidak berlaku.
+17. **Kolom isian dan galat formulir.** Galat per kolom memakai garis tepi `ink`, ikon, dan teks tebal, bukan warna merah, supaya aturan "warna berarti status" tetap utuh.
 
 ## 12. Buku (celah desain, belum divisualkan Stitch)
 

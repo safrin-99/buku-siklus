@@ -24,6 +24,7 @@
   --color-on-ink: #ffffff;
   --color-primary: #1e1b4b;
   --color-primary-pressed: #2e2a72;
+  --color-focus-ring: rgb(46 42 114 / 0.35);
   --color-status-due-text: #92400e;
   --color-status-due-bg: #fffbeb;
   --color-status-due-mark: #d97706;

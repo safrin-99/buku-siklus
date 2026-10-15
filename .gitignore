@@ -1,7 +1,10 @@
 node_modules
 dist
+dist-fixture
 audit-out
 .env
 .env.*
 !.env.example
 *.local
+supabase/.temp
+supabase/.branches
