@@ -29,7 +29,7 @@ export function StackLayout() {
 /** Screens outside the main flow (sign in, session loading, config error): no navigation. */
 export function FullScreen({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto min-h-dvh max-w-app pb-[calc(2rem+env(safe-area-inset-bottom))]">
+    <div className="mx-auto flex min-h-dvh max-w-app flex-col pb-[calc(2rem+env(safe-area-inset-bottom))]">
       <OfflineBanner />
       {children}
     </div>

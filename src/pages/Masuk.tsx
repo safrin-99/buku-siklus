@@ -3,7 +3,6 @@ import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { AUTH_MESSAGES, AuthFailure } from '../auth/authErrors';
 import { useAuth } from '../auth/AuthProvider';
-import { BrandMark } from '../components/ui/BrandMark';
 import { Button } from '../components/ui/Button';
 import { FormAlert } from '../components/ui/FormAlert';
 import { TextField } from '../components/ui/TextField';
@@ -51,26 +50,18 @@ export function Masuk() {
   }
 
   return (
-    <div className="px-4 pb-6 pt-[12dvh]">
-      <div className="mb-8 flex flex-col items-center gap-4 text-center">
-        <BrandMark />
-        <div>
-          <h1 className="text-display font-bold">Buku Siklus</h1>
-          <p className="mt-1 text-body text-ink-2">Utang dan piutang, per siklus gajian.</p>
-        </div>
-      </div>
+    <main className="px-4 pt-[calc(2rem+env(safe-area-inset-top))] sm:pt-20">
+      <header className="border-t-2 border-ink pt-3">
+        <p className="text-section font-bold uppercase text-ink-2">Buku Siklus</p>
+        <h1 className="mt-1 text-display font-bold">Masuk</h1>
+      </header>
 
-      <form
-        onSubmit={(event) => void onSubmit(event)}
-        noValidate
-        aria-label="Masuk"
-        className="flex flex-col gap-5 rounded-card border border-border bg-surface p-5"
-      >
-        <h2 className="text-title font-bold">Masuk</h2>
+      <form onSubmit={(event) => void onSubmit(event)} noValidate aria-label="Masuk" className="mt-10 flex flex-col gap-5">
         <TextField
           label="Email"
           type="email"
           inputMode="email"
+          enterKeyHint="next"
           autoComplete="username"
           autoCapitalize="none"
           spellCheck={false}
@@ -80,6 +71,7 @@ export function Masuk() {
         <TextField
           label="Kata sandi"
           type={reveal ? 'text' : 'password'}
+          enterKeyHint="go"
           autoComplete="current-password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
@@ -96,12 +88,14 @@ export function Masuk() {
           }
         />
         {error ? <FormAlert>{error}</FormAlert> : null}
-        <Button type="submit" disabled={pending} aria-busy={pending}>
-          {pending ? 'Memproses…' : 'Masuk'}
-        </Button>
+        {/* Directly under the fields, not pinned to the bottom: Chrome on Android does not shrink the layout when the
+            keyboard opens, so a bottom-pinned button would sit behind the keyboard. */}
+        <div className="pt-2">
+          <Button type="submit" disabled={pending} aria-busy={pending}>
+            {pending ? 'Memproses…' : 'Masuk'}
+          </Button>
+        </div>
       </form>
-
-      <p className="mt-4 text-center text-caption text-ink-2">Akun pemilik dibuat lewat dashboard Supabase.</p>
-    </div>
+    </main>
   );
 }
