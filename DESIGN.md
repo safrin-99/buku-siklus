@@ -29,6 +29,7 @@ colors:
 typography:
   font-family: Plus Jakarta Sans
   money-hero:   {size: 32px, weight: 700, line: 38px, tracking: -0.02em, numeric: tabular}
+  display:      {size: 32px, weight: 700, line: 38px, tracking: -0.02em}
   money-lg:     {size: 20px, weight: 700, line: 26px, tracking: -0.01em, numeric: tabular}
   money-md:     {size: 16px, weight: 600, line: 22px, numeric: tabular}
   title:        {size: 20px, weight: 700, line: 26px, tracking: -0.01em}
@@ -228,7 +229,7 @@ Penyesuaian saat implementasi (15 Okt 2026, diverifikasi di 360px dan 412px):
 Penambahan saat membangun login (15 Okt 2026, diverifikasi di 360px dan 412px):
 
 15. **Akun di Pengaturan.** Satu-satunya mitigasi "HP hilang" yang disebut CLAUDE.md adalah sesi yang bisa dicabut, jadi `Keluar` dan `Keluar dari semua perangkat` ada di Pengaturan, bagian `Akun`. Yang kedua bertombol destruktif dan meminta konfirmasi satu langkah yang menjelaskan akibatnya. Bagian Pengaturan lain belum dibangun dan dinyatakan jujur di layar (`Pengaturan lain belum dibangun.`).
-16. **Layar Masuk** (di luar tujuh layar utama): satu kartu form berisi `Email`, `Kata sandi` (dengan tombol tampilkan/sembunyikan berukuran ketuk 48px), dan tombol primer `Masuk`. Tanpa pendaftaran dan tanpa "lupa kata sandi": akun dikelola lewat dashboard Supabase. Galat tampil sebagai kotak netral dengan ikon, bukan merah (merah hanya untuk "terlambat"); pesan untuk email salah dan kata sandi salah sama persis. State: normal, memproses (`Memproses…`), galat. State kosong tidak berlaku.
+16. **Layar Masuk** (di luar tujuh layar utama): blok identitas di atas (tanda aplikasi 56px, nama `Buku Siklus` memakai token `display`, satu kalimat faktual `Utang dan piutang, per siklus gajian.`), lalu satu kartu form berjudul `Masuk` berisi `Email`, `Kata sandi` (dengan tombol tampilkan/sembunyikan berukuran ketuk 48px), dan tombol primer `Masuk`; satu baris keterangan di bawah kartu (`Akun pemilik dibuat lewat dashboard Supabase.`). Blok dimulai ±12% dari atas layar, bukan di tengah, supaya tetap terlihat saat keyboard terbuka. Tanda aplikasi adalah identitas (glif yang sama dengan favicon), bukan ilustrasi dekoratif. Tanpa pendaftaran dan tanpa "lupa kata sandi": akun dikelola lewat dashboard Supabase. Galat tampil sebagai kotak netral dengan ikon, bukan merah (merah hanya untuk "terlambat"); pesan untuk email salah dan kata sandi salah sama persis. State: normal, memproses (`Memproses…`), galat. State kosong tidak berlaku.
 17. **Kolom isian dan galat formulir.** Galat per kolom memakai garis tepi `ink`, ikon, dan teks tebal, bukan warna merah, supaya aturan "warna berarti status" tetap utuh.
 
 Penambahan saat membangun Catat pembayaran (15 Okt 2026, diverifikasi di 360px dan 412px):

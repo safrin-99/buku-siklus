@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { AUTH_MESSAGES, AuthFailure } from '../auth/authErrors';
 import { useAuth } from '../auth/AuthProvider';
-import { ScreenHeader } from '../components/layout/ScreenHeader';
+import { BrandMark } from '../components/ui/BrandMark';
 import { Button } from '../components/ui/Button';
 import { FormAlert } from '../components/ui/FormAlert';
 import { TextField } from '../components/ui/TextField';
@@ -51,50 +51,57 @@ export function Masuk() {
   }
 
   return (
-    <>
-      <ScreenHeader title="Masuk" settings={false} />
-      <div className="px-4 pb-6">
-        <form
-          onSubmit={(event) => void onSubmit(event)}
-          noValidate
-          aria-label="Masuk"
-          className="flex flex-col gap-4 rounded-card border border-border bg-surface p-4"
-        >
-          <p className="text-body text-ink-2">Masuk dengan akun pemilik buku.</p>
-          <TextField
-            label="Email"
-            type="email"
-            inputMode="email"
-            autoComplete="username"
-            autoCapitalize="none"
-            spellCheck={false}
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-          />
-          <TextField
-            label="Kata sandi"
-            type={reveal ? 'text' : 'password'}
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            trailing={
-              <button
-                type="button"
-                onClick={() => setReveal((value) => !value)}
-                aria-label={reveal ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
-                aria-pressed={reveal}
-                className="grid size-12 place-items-center text-ink-2"
-              >
-                {reveal ? <EyeOff aria-hidden size={20} /> : <Eye aria-hidden size={20} />}
-              </button>
-            }
-          />
-          {error ? <FormAlert>{error}</FormAlert> : null}
-          <Button type="submit" disabled={pending} aria-busy={pending}>
-            {pending ? 'Memproses…' : 'Masuk'}
-          </Button>
-        </form>
+    <div className="px-4 pb-6 pt-[12dvh]">
+      <div className="mb-8 flex flex-col items-center gap-4 text-center">
+        <BrandMark />
+        <div>
+          <h1 className="text-display font-bold">Buku Siklus</h1>
+          <p className="mt-1 text-body text-ink-2">Utang dan piutang, per siklus gajian.</p>
+        </div>
       </div>
-    </>
+
+      <form
+        onSubmit={(event) => void onSubmit(event)}
+        noValidate
+        aria-label="Masuk"
+        className="flex flex-col gap-5 rounded-card border border-border bg-surface p-5"
+      >
+        <h2 className="text-title font-bold">Masuk</h2>
+        <TextField
+          label="Email"
+          type="email"
+          inputMode="email"
+          autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+        />
+        <TextField
+          label="Kata sandi"
+          type={reveal ? 'text' : 'password'}
+          autoComplete="current-password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          trailing={
+            <button
+              type="button"
+              onClick={() => setReveal((value) => !value)}
+              aria-label={reveal ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+              aria-pressed={reveal}
+              className="grid size-12 place-items-center text-ink-2"
+            >
+              {reveal ? <EyeOff aria-hidden size={20} /> : <Eye aria-hidden size={20} />}
+            </button>
+          }
+        />
+        {error ? <FormAlert>{error}</FormAlert> : null}
+        <Button type="submit" disabled={pending} aria-busy={pending}>
+          {pending ? 'Memproses…' : 'Masuk'}
+        </Button>
+      </form>
+
+      <p className="mt-4 text-center text-caption text-ink-2">Akun pemilik dibuat lewat dashboard Supabase.</p>
+    </div>
   );
 }
