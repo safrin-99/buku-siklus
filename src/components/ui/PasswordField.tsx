@@ -22,7 +22,9 @@ export function PasswordField({ label, revealName, ...rest }: Props) {
         <button
           type="button"
           onClick={() => setReveal((value) => !value)}
-          aria-label={`${reveal ? 'Sembunyikan' : 'Tampilkan'} ${name}`}
+          // A toggle keeps one name and reports its state through aria-pressed ("Tampilkan kata sandi, ditekan");
+          // changing the name as well would announce the state twice and contradict itself.
+          aria-label={`Tampilkan ${name}`}
           aria-pressed={reveal}
           className="grid size-12 place-items-center text-ink-2"
         >

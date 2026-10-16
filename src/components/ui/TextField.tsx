@@ -26,18 +26,24 @@ export function TextField({ label, error, hint, prefix, leading, trailing, id, .
   const autoId = useId();
   const inputId = id ?? autoId;
   const describedBy = [error ? `${inputId}-error` : '', hint ? `${inputId}-hint` : ''].filter(Boolean).join(' ');
+  const locked = Boolean(input.readOnly || input.disabled);
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={inputId} className="text-caption font-semibold text-ink-2">
+      <label htmlFor={inputId} className={cx('text-caption font-semibold', error ? 'text-ink' : 'text-ink-2')}>
         {label}
       </label>
       <div
         className={cx(
-          // --field-bg: the colour index.css paints over Chrome's autofill background.
-          'relative h-13 rounded-input border-[1.5px] bg-surface [--field-bg:var(--color-surface)]',
-          'focus-within:border-primary-pressed focus-within:ring-4 focus-within:ring-focus-ring',
-          error ? 'border-ink' : 'border-border-field',
+          // States (DESIGN.md section 6, Input). Normal: neutral border. Focus: indigo border + outer ring. Invalid: a
+          // heavier ink border (extra 1px drawn inside, so nothing shifts) that STAYS while focused; focus then shows as
+          // the outer ring only, so typing into a flagged field never hides the error. Locked (read-only/disabled):
+          // inset background. --field-bg is the colour index.css paints over Chrome's autofill background.
+          'relative h-13 rounded-input border-[1.5px] focus-within:ring-4 focus-within:ring-focus-ring',
+          locked ? 'bg-surface-inset [--field-bg:var(--color-surface-inset)]' : 'bg-surface [--field-bg:var(--color-surface)]',
+          error
+            ? 'border-ink inset-ring-1 inset-ring-ink'
+            : cx(locked ? 'border-border-strong' : 'border-border-field', 'focus-within:border-primary-pressed'),
         )}
       >
         <input
@@ -45,7 +51,7 @@ export function TextField({ label, error, hint, prefix, leading, trailing, id, .
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy || undefined}
           className={cx(
-            'size-full rounded-input bg-transparent text-body text-ink outline-none placeholder:text-muted',
+            'size-full rounded-input bg-transparent text-body text-ink outline-none placeholder:text-muted disabled:cursor-not-allowed',
             leading || prefix ? 'pl-12' : 'pl-4',
             trailing ? 'pr-12' : 'pr-4',
           )}
