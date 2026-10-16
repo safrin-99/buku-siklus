@@ -1,5 +1,5 @@
 import { CircleAlert } from 'lucide-react';
-import { useId, type InputHTMLAttributes, type ReactNode } from 'react';
+import { useId, type InputHTMLAttributes, type ReactNode, type Ref } from 'react';
 import { cx } from '../../lib/cx';
 
 export interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'className' | 'prefix'> {
@@ -13,25 +13,19 @@ export interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElemen
   leading?: ReactNode;
   /** Element at the right end of the field (e.g. a show-password button). Needs its own tap area of at least 48px. */
   trailing?: ReactNode;
-  /** `outline` (default, forms in the app): white with a border. `filled`: inset background, border only on focus. */
-  variant?: 'outline' | 'filled';
+  /** Forwarded to the input (React 19 passes `ref` as a prop), e.g. to focus the first invalid field. */
+  ref?: Ref<HTMLInputElement>;
 }
 
-const box: Record<NonNullable<TextFieldProps['variant']>, string> = {
-  outline: 'bg-surface [--field-bg:var(--color-surface)]',
-  filled: 'bg-surface-inset [--field-bg:var(--color-surface-inset)]',
-};
-
 /**
- * Text field: label on top, 52px tall, radius 12, 1.5px border (DESIGN.md section 6).
+ * Text field: label on top, 52px tall, radius 12, 1.5px `border-field` border (3:1 against white, DESIGN.md section 6).
  * The input itself spans the whole box (prefix, icon and button sit on top of its padding), so anything the browser
  * paints on the input, such as Chrome's autofill colour, covers the field evenly instead of a strip in the middle.
  */
-export function TextField({ label, error, hint, prefix, leading, trailing, variant = 'outline', id, ...input }: TextFieldProps) {
+export function TextField({ label, error, hint, prefix, leading, trailing, id, ...input }: TextFieldProps) {
   const autoId = useId();
   const inputId = id ?? autoId;
   const describedBy = [error ? `${inputId}-error` : '', hint ? `${inputId}-hint` : ''].filter(Boolean).join(' ');
-  const quietBorder = variant === 'filled' ? 'border-transparent' : 'border-border-strong';
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -40,9 +34,10 @@ export function TextField({ label, error, hint, prefix, leading, trailing, varia
       </label>
       <div
         className={cx(
-          'relative h-13 rounded-input border-[1.5px] focus-within:border-primary-pressed focus-within:ring-4 focus-within:ring-focus-ring',
-          box[variant],
-          error ? 'border-ink' : quietBorder,
+          // --field-bg: the colour index.css paints over Chrome's autofill background.
+          'relative h-13 rounded-input border-[1.5px] bg-surface [--field-bg:var(--color-surface)]',
+          'focus-within:border-primary-pressed focus-within:ring-4 focus-within:ring-focus-ring',
+          error ? 'border-ink' : 'border-border-field',
         )}
       >
         <input

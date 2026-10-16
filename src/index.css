@@ -18,6 +18,7 @@
   --color-surface-inset: #f4f1ea;
   --color-border: #e7e3da;
   --color-border-strong: #cfc9bc;
+  --color-border-field: #8a8478; /* garis kolom isian: 3,72:1 di atas surface, 3,53:1 di atas canvas (WCAG 1.4.11 butuh 3:1) */
   --color-ink: #1e1b4b;
   --color-ink-2: #4b5563; /* teks pendukung; satu-satunya teks sekunder di atas surface-inset */
   --color-muted: #6b7280; /* hanya di atas canvas/surface (4,6:1 dan 4,83:1) */
@@ -42,6 +43,13 @@
   --text-money-hero: 32px;
   --text-money-hero--line-height: 38px;
   --text-money-hero--letter-spacing: -0.02em;
+  /* Wordmark di sampul layar Masuk saja. */
+  --text-brand: 40px;
+  --text-brand--line-height: 42px;
+  --text-brand--letter-spacing: -0.03em;
+  --text-brand-lg: 56px;
+  --text-brand-lg--line-height: 58px;
+  --text-brand-lg--letter-spacing: -0.035em;
   --text-display: 32px;
   --text-display--line-height: 38px;
   --text-display--letter-spacing: -0.02em;
