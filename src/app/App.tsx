@@ -1,5 +1,5 @@
 import { Route, Routes } from 'react-router-dom';
-import { FullScreen, StackLayout, TabLayout } from '../components/layout/Layouts';
+import { StackLayout, TabLayout } from '../components/layout/Layouts';
 import { Beranda } from '../pages/Beranda';
 import { Catatan } from '../pages/Catatan';
 import { CatatPembayaran } from '../pages/CatatPembayaran';
@@ -16,14 +16,8 @@ import { RequireAuth } from './RequireAuth';
 export function App() {
   return (
     <Routes>
-      <Route
-        path="masuk"
-        element={
-          <FullScreen>
-            <Masuk />
-          </FullScreen>
-        }
-      />
+      {/* Masuk draws its own full-bleed layout (ink band + page). */}
+      <Route path="masuk" element={<Masuk />} />
       <Route element={<RequireAuth />}>
         <Route element={<TabLayout />}>
           <Route index element={<Beranda />} />
