@@ -251,6 +251,141 @@ async function main() {
       assert.ok(!(await page.locator('body').innerText()).includes('Utang Telat E2E'), 'utang lunas tidak lagi di Perlu dibayar');
     });
 
+    // ---- Catatan: tambah, cari/filter, Beranda, Kalender, ubah, hapus, lunasi (ground truth from the database) ----
+    const debtsNamed = async (name) => {
+      const { data, error } = await owner.from('debts').select('id, total_idr, memo, installments(seq, due_date, amount_idr)').eq('name', name);
+      if (error) throw new Error(error.message);
+      return data;
+    };
+    const today = todayMakassar();
+
+    await step('Tambah utang: validasi per kolom; klik ganda Simpan = satu catatan; tampil di Detail dan bertahan setelah reload', async () => {
+      await page.goto(`${BASE}/tambah`);
+      await page.getByRole('heading', { name: 'Tambah catatan', level: 1 }).waitFor();
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByText('Isi nama orang atau pihaknya.').waitFor();
+      await page.getByText('Isi nominalnya.').waitFor();
+      await page.getByText('Isi tanggal jatuh tempo.').waitFor();
+      assert.deepEqual(await debtsNamed('Utang Form E2E'), []);
+
+      await page.getByLabel('Berutang kepada').fill('Utang Form E2E');
+      await page.getByLabel('Nominal total').fill('450000');
+      await page.getByLabel('Jatuh tempo', { exact: true }).fill(today);
+      await page.getByLabel('Keterangan (opsional)').fill('Dibuat lewat form');
+      await page.getByRole('button', { name: 'Simpan' }).dblclick();
+      await page.getByRole('heading', { name: 'Detail catatan' }).waitFor();
+      await page.getByRole('heading', { name: 'Utang Form E2E' }).waitFor();
+      const rows = await debtsNamed('Utang Form E2E');
+      assert.equal(rows.length, 1, 'klik ganda tidak boleh membuat dua catatan');
+      assert.equal(rows[0].total_idr, 450_000);
+      assert.deepEqual(rows[0].installments.map((i) => [i.seq, i.due_date, i.amount_idr]), [[1, today, 450_000]]);
+      assert.equal(new URL(page.url()).pathname, `/catatan/${rows[0].id}`);
+
+      await page.reload();
+      await page.getByRole('heading', { name: 'Utang Form E2E' }).waitFor();
+    });
+
+    await step('Catatan: pencarian dan filter status menemukan catatan baru; pencarian bertahan setelah membuka detail; Beranda ikut', async () => {
+      await page.goto(`${BASE}/catatan`);
+      await page.getByPlaceholder('Cari nama atau catatan').fill('form e2e');
+      const list = page.getByRole('list', { name: 'Daftar utang' });
+      await list.getByText('Utang Form E2E').waitFor();
+      assert.equal(await list.getByRole('listitem').count(), 1);
+      await page.getByRole('button', { name: 'Terlambat' }).click();
+      await page.getByText('Tidak ada catatan yang cocok.').waitFor();
+      await page.getByRole('button', { name: 'Aktif' }).click();
+      await list.getByText('Utang Form E2E').click();
+      await page.getByRole('heading', { name: 'Detail catatan' }).waitFor();
+      await page.goBack();
+      assert.equal(await page.getByPlaceholder('Cari nama atau catatan').inputValue(), 'form e2e');
+      await list.getByText('Utang Form E2E').waitFor();
+
+      await page.goto(BASE + '/');
+      await page.getByRole('list', { name: 'Perlu dibayar' }).getByText('Utang Form E2E').waitFor();
+    });
+
+    // Monthly installments starting next month, so the calendar has to move forward to find them.
+    const firstDue = shift(today, 35);
+    const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    const [fy, fm, fd] = firstDue.split('-').map(Number);
+    const monthsAhead = (fy * 12 + fm) - (Number(today.slice(0, 4)) * 12 + Number(today.slice(5, 7)));
+
+    await step('Tambah piutang 3 cicilan: jadwal tersimpan; Kalender: pindah bulan, pilih tanggal, buka catatan, kembali ke posisi yang sama', async () => {
+      await page.goto(`${BASE}/tambah?jenis=piutang`);
+      assert.equal(await page.getByRole('radio', { name: 'Piutang' }).isChecked(), true, 'jenis terisi dari tautan');
+      await page.getByLabel('Yang berutang kepadamu').fill('Piutang Cicil E2E');
+      await page.getByLabel('Nominal total').fill('300000');
+      await page.getByText('Cicilan bulanan').click();
+      await page.getByLabel('Jumlah cicilan').fill('3');
+      await page.getByLabel('Jatuh tempo cicilan pertama').fill(firstDue);
+      await page.getByRole('list', { name: 'Jadwal cicilan' }).waitFor();
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByRole('heading', { name: 'Piutang Cicil E2E' }).waitFor();
+      const [row] = await debtsNamed('Piutang Cicil E2E');
+      assert.equal(row.installments.length, 3);
+      assert.equal(row.installments.reduce((sum, i) => sum + i.amount_idr, 0), 300_000);
+
+      await page.goto(`${BASE}/catatan?tab=piutang`);
+      await page.getByRole('list', { name: 'Daftar piutang' }).getByText('Piutang Cicil E2E').waitFor();
+
+      await page.goto(`${BASE}/kalender`);
+      for (let i = 0; i < monthsAhead; i += 1) await page.getByRole('button', { name: 'Bulan berikutnya' }).click();
+      await page.getByRole('heading', { name: `${MONTHS[fm - 1]} ${fy}` }).waitFor();
+      await page.getByRole('button', { name: new RegExp(`^\\w+, ${fd} ${MONTHS[fm - 1]} ${fy}`) }).click();
+      const agenda = page.getByRole('region', { name: 'Agenda' });
+      await agenda.getByText('Piutang Cicil E2E').click();
+      await page.getByRole('heading', { name: 'Detail catatan' }).waitFor();
+      await page.goBack();
+      await agenda.getByText('Piutang Cicil E2E').waitFor();
+      const url = new URL(page.url());
+      assert.equal(url.searchParams.get('tanggal'), firstDue, 'tanggal terpilih bertahan setelah kembali');
+    });
+
+    await step('Ubah memo tersimpan; hapus catatan tanpa pembayaran (dengan konfirmasi) hilang dari database dan Kalender; catatan berpembayaran tidak bisa dihapus', async () => {
+      const [row] = await debtsNamed('Piutang Cicil E2E');
+      await page.goto(`${BASE}/catatan/${row.id}`);
+      await page.getByRole('link', { name: 'Ubah catatan' }).click();
+      await page.getByLabel('Memo (opsional)').fill('Dicicil tiga kali');
+      await page.getByRole('button', { name: 'Simpan perubahan' }).click();
+      await page.getByRole('heading', { name: 'Detail catatan' }).waitFor();
+      await page.getByText('Dicicil tiga kali').waitFor();
+      assert.equal((await debtsNamed('Piutang Cicil E2E'))[0].memo, 'Dicicil tiga kali');
+
+      await page.getByRole('link', { name: 'Ubah catatan' }).click();
+      await page.getByRole('button', { name: 'Hapus catatan' }).click();
+      await page.getByText('akan dihapus permanen').waitFor();
+      assert.equal((await debtsNamed('Piutang Cicil E2E')).length, 1, 'belum terhapus sebelum dikonfirmasi');
+      await page.getByRole('button', { name: 'Ya, hapus catatan' }).click();
+      await page.getByRole('heading', { name: 'Catatan', level: 1, exact: true }).waitFor();
+      assert.deepEqual(await debtsNamed('Piutang Cicil E2E'), []);
+      await page.goto(`${BASE}/kalender?bulan=${firstDue.slice(0, 7)}&tanggal=${firstDue}`);
+      await page.getByText('Tidak ada tagihan di tanggal ini.').waitFor();
+
+      await page.goto(`${BASE}/catatan/${debtId}/ubah`);
+      await page.getByText('sudah punya riwayat pembayaran, jadi tidak bisa dihapus').waitFor();
+      assert.equal(await page.getByRole('button', { name: 'Hapus catatan' }).count(), 0);
+    });
+
+    await step('Lunasi lewat "Isi sisa penuh": status Lunas, ledger sama dengan total, hilang dari Perlu dibayar di Beranda', async () => {
+      const [row] = await debtsNamed('Utang Form E2E');
+      await page.goto(`${BASE}/catatan/${row.id}/bayar`);
+      const amount = page.getByLabel('Nominal dibayar');
+      // A single payment is prefilled with the full rest, so the shortcut is hidden until the amount differs.
+      assert.equal(await amount.inputValue(), '450.000');
+      assert.equal(await page.getByRole('button', { name: /Isi sisa penuh/ }).count(), 0);
+      await amount.fill('100000');
+      await page.getByRole('button', { name: /Isi sisa penuh/ }).click();
+      assert.equal(await amount.inputValue(), '450.000');
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByRole('heading', { name: 'Detail catatan' }).waitFor();
+      await page.getByText('Lunas', { exact: true }).first().waitFor();
+      const { data } = await owner.from('payments').select('amount_idr').eq('debt_id', row.id);
+      assert.equal(data.reduce((sum, p) => sum + p.amount_idr, 0), 450_000);
+      await page.goto(BASE + '/');
+      await page.getByText('Total utang').waitFor();
+      assert.ok(!(await page.locator('body').innerText()).includes('Utang Form E2E'), 'utang lunas tidak lagi di Perlu dibayar');
+    });
+
     await step('Gajian: tanggal di luar 1–28 ditolak di klien; simpan mengubah buku dan kartu siklus Beranda', async () => {
       const bookRow = async () => {
         const { data, error } = await owner.from('books').select('payday_day, base_salary_idr').single();

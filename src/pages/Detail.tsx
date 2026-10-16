@@ -125,11 +125,16 @@ function Content({ detail, today }: { detail: DebtDetail; today: string }) {
         </div>
       </section>
 
-      {debt.remaining_idr > 0 ? (
-        <Link to={`/catatan/${debt.debt_id}/bayar`} className={buttonClass('primary')}>
-          Catat pembayaran
+      <div className="flex flex-col gap-3">
+        {debt.remaining_idr > 0 ? (
+          <Link to={`/catatan/${debt.debt_id}/bayar`} className={buttonClass('primary')}>
+            Catat pembayaran
+          </Link>
+        ) : null}
+        <Link to={`/catatan/${debt.debt_id}/ubah`} className={buttonClass('secondary')}>
+          Ubah catatan
         </Link>
-      ) : null}
+      </div>
     </>
   );
 }

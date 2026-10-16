@@ -30,21 +30,21 @@ tests/
 src/
   app/                   # routing, guard (RequireAuth), gerbang data (DataGate), galat konfigurasi
   auth/                  # AuthService (Supabase + fixture), pemetaan galat, validasi akun, tautan email (authLink), AuthProvider
-  lib/{money,dates,status,derive,cx,config,env,supabase}.ts
+  lib/{money,dates,status,derive,schedule,calendar,cx,config,env,supabase}.ts
   data/                  # DataSource, konteks, skema Zod, fixture hasil SQL
   integration/           # uji terhadap Supabase LOKAL sungguhan (*.local.test.ts; pnpm test:local)
-  pages/                 # layar (Beranda, Catatan, Detail, Masuk, Pengaturan, Gajian, KataSandi, Email, Placeholder)
+  pages/                 # layar (Beranda, Catatan, Detail, TambahCatatan, UbahCatatan, Kalender, KotakMasuk, Masuk, Pengaturan, Gajian, KataSandi, Email, Placeholder)
   components/{ui,layout}/  # komponen sesuai DESIGN.md
 scripts/                 # gen-fixtures.mjs, audit-ui.mjs, e2e-local.mjs, lib/browser.mjs (pembantu bersama)
 ```
 
 ## Perintah
 
-- `pnpm dev`, `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test` (vitest, 143 tes termasuk uji kontrak SQL → Zod)
+- `pnpm dev`, `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test` (vitest, 166 tes termasuk uji kontrak SQL → Zod)
 - Env (`.env.local`, lihat `.env.example`): `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (hanya kunci publishable/anon). Build produksi **gagal** bila env kosong atau berisi kunci rahasia (`sb_secret_`/`service_role`). Data contoh hanya lewat `pnpm dev:fixture` (`--mode fixture`); build biasa tidak memuatnya.
-- `pnpm test:db` (17 tes skema + RLS + ledger + fixture tidak basi, PGlite, ±50 detik)
-- `pnpm test:local` (50 tes integrasi ke Supabase lokal sungguhan: GoTrue + PostgREST + RLS lewat HTTP, termasuk tulis ledger dengan gangguan jaringan yang disuntikkan dan ganti email dengan tautan asli dari Mailpit; butuh Docker dan `supabase start` termasuk Mailpit; menolak URL non-lokal karena ledger tidak bisa dihapus)
-- `pnpm e2e:local` (15 langkah di Chromium asli terhadap stack lokal, dicek silang ke database: login, data, sesi bertahan setelah reload, Catat pembayaran (klik ganda = satu baris), offline ditolak, pembatalan dengan entri pembalik, pelunasan, Gajian, Ganti kata sandi, Ganti email (kedua tautan dari Mailpit), Keluar, Keluar dari semua perangkat; membangun sendiri ke `dist-e2e/`)
+- `pnpm test:db` (24 tes skema + RLS + ledger + `create_debt` + hak kolom + fixture tidak basi, PGlite, ±50 detik)
+- `pnpm test:local` (60 tes integrasi ke Supabase lokal sungguhan: GoTrue + PostgREST + RLS lewat HTTP, termasuk tulis ledger dengan gangguan jaringan yang disuntikkan dan ganti email dengan tautan asli dari Mailpit; butuh Docker dan `supabase start` termasuk Mailpit; menolak URL non-lokal karena ledger tidak bisa dihapus)
+- `pnpm e2e:local` (20 langkah di Chromium asli terhadap stack lokal, dicek silang ke database: login, data, sesi bertahan setelah reload, Catat pembayaran (klik ganda = satu baris), offline ditolak, pembatalan dengan entri pembalik, pelunasan, Tambah utang dan piutang (klik ganda = satu catatan, reload), pencarian/filter, Kalender, ubah memo, hapus, lunasi, Gajian, Ganti kata sandi, Ganti email (kedua tautan dari Mailpit), Keluar, Keluar dari semua perangkat; membangun sendiri ke `dist-e2e/`)
 - `pnpm gen:fixtures` membangkitkan ulang `src/data/fixtures.generated.json` dari SQL asli. Wajib dijalankan setelah migrasi atau `seed.sql` berubah; `test:db` gagal bila lupa.
 - `pnpm audit:ui` (membangun sendiri dalam mode fixture ke `dist-fixture/`): membuka build di Chromium 360px dan 412px, memeriksa overflow, teks < 12px, kontras, target < 44px, nama aksesibel, emoji, angka tabular, termasuk keadaan setelah interaksi; tangkapan layar ke `audit-out/`. Simulasi state: `?fixture=loading|slow|error|empty|signedout`.
 - `supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor` (db, gateway, auth, REST, Mailpit di 127.0.0.1:54324; cukup untuk `test:local` dan `e2e:local`), `supabase db reset`. Migrasi + seed sudah terbukti lolos di Postgres Supabase lokal; `supabase functions serve` belum dijalankan.
@@ -52,8 +52,8 @@ scripts/                 # gen-fixtures.mjs, audit-ui.mjs, e2e-local.mjs, lib/br
 
 ## Status implementasi
 
-Sudah: skema + RLS + seed (teruji di PGlite dan Postgres Supabase lokal), lapisan data (DataSource: fixture dari SQL dan Supabase), komponen UI, layar Beranda, Catatan, Detail, login pemilik (email + kata sandi), layar Masuk, Pengaturan bagian Akun (Ganti email, Ganti kata sandi, Keluar, Keluar dari semua perangkat) dan Gajian (tanggal gajian, gaji pokok), Catat pembayaran dan pembatalan lewat entri pembalik. Jalur baca dan tulis Supabase teruji end-to-end di browser terhadap stack lokal (belum terhadap proyek asli).
-Belum: Catatan baru (Tambah catatan), memo yang bisa diedit, foto bukti pembayaran (`proof_path`, butuh bucket Storage), tombol `Ingatkan lewat WhatsApp`, Kotak Masuk, Kalender, Pengaturan (selain Akun dan Gajian; opsi geser ke hari kerja belum), RPC `create_debt`, Edge Function, PWA, pemilih buku. Rute belum dibangun menampilkan `Placeholder` yang jujur.
+Sudah: skema + RLS + seed (teruji di PGlite dan Postgres Supabase lokal), lapisan data (DataSource: fixture dari SQL dan Supabase), komponen UI, layar Beranda, Catatan, Detail, **Tambah catatan** (manual, utang/piutang, sekali bayar atau cicilan bulanan, lewat RPC `create_debt`), **Ubah catatan** (teks + memo) dan **hapus** (hanya tanpa pembayaran), **Kalender**, login pemilik (email + kata sandi), layar Masuk, Pengaturan bagian Akun (Ganti email, Ganti kata sandi, Keluar, Keluar dari semua perangkat) dan Gajian (tanggal gajian, gaji pokok), Catat pembayaran (termasuk `Isi sisa penuh`) dan pembatalan lewat entri pembalik. Jalur baca dan tulis Supabase teruji end-to-end di browser terhadap stack lokal (belum terhadap proyek asli; migrasi `20261016000001_create_debt.sql` harus di-`db push` ke proyek asli).
+Belum: Tambah cepat (teks bebas/foto, butuh Edge Function AI), Kotak Masuk (layar konfirmasi + penangkap notifikasi; layarnya kini menyatakan status jujur), foto bukti pembayaran (`proof_path`, butuh bucket Storage), tombol `Ingatkan lewat WhatsApp`, mengubah nominal/jadwal catatan yang sudah ada (koreksi = hapus lalu buat ulang), Pengaturan (selain Akun dan Gajian; opsi geser ke hari kerja belum), Edge Function, PWA, pemilih buku. Rute belum dibangun menampilkan `Placeholder` yang jujur.
 
 ## Model data: buku (keputusan)
 
@@ -63,7 +63,9 @@ Belum: Catatan baru (Tambah catatan), memo yang bisa diedit, foto bukti pembayar
 - Buku tidak dihapus, hanya diarsipkan (`archived_at`). Pembayaran append-only; koreksi lewat entri pembalik.
 - **Keputusan (15 Okt 2026): aplikasi hanya dipegang pemilik.** Tidak ada pengguna kedua. Buku untuk orang lain (mis. pacar) adalah buku terpisah milik akun pemilik, diinput manual oleh pemilik. Tabel `book_members` tetap ada (pemilik otomatis jadi `owner`), tapi **UI undangan/berbagi tidak dibangun**. Jangan membangunnya tanpa keputusan baru.
 - Catatan dan notifikasi yang masuk otomatis hanya milik perangkat pengguna. Buku orang lain **tidak punya penangkap otomatis**; isinya diinput manual/teks bebas.
-- Membuat catatan beserta jadwal cicilan harus atomik: buat RPC `create_debt` (catatan + cicilan dalam satu transaksi) dan cek `debt_integrity_issues` kosong. Jangan menyisipkan dari klien dalam dua langkah terpisah.
+- Membuat catatan beserta jadwal cicilan harus atomik: RPC `create_debt` (migrasi `20261016000001`, SECURITY INVOKER: RLS pemanggil berlaku) membuat catatan + cicilan dalam satu transaksi, memvalidasi ulang semua batas form (nama 1–80, teks, total > 0, 1–120 cicilan bilangan bulat > 0, jumlah = total, tanggal 2000–2100), dan idempoten per id buatan klien (`src/data/supabaseSource.ts` memakai `settleWrite` seperti ledger). Jangan menyisipkan dari klien dalam dua langkah terpisah.
+- `debts` hanya bisa di-UPDATE pada kolom teks (`name`, `description`, `category`, `memo`, `match_aliases`; hak kolom). Total, jenis, dan buku tidak bisa diubah lewat API. Hapus hanya untuk catatan tanpa pembayaran (FK `payments` ON DELETE RESTRICT; klien memetakan 23503 ke `has_payments`).
+- Aturan Beranda saat ini: `Sisa kas setelah cicilan` = gaji − cicilan utang yang jatuh tempo di siklus ini (termasuk yang sudah dibayar). Tunggakan siklus lalu (`carryover_overdue_idr`) **tidak** dikurangkan; ditampilkan sebagai baris terpisah. Piutang tidak memengaruhi kewajiban. Pembayaran sebagian dihitung `terbayar` siklus hanya bila satu cicilan penuh terbayar (alokasi kumulatif dari cicilan terawal).
 - Perhitungan (status, siklus, sisa) ada di fungsi SQL `debt_list` dan `cycle_summary`; frontend hanya menampilkan. `p_today` bisa diisi untuk tes.
 
 ## Privasi data orang lain

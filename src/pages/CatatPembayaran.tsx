@@ -11,7 +11,7 @@ import { useDebtDetail, useRecordPayment, useToday } from '../data/hooks';
 import { PAYMENT_WRITE_MESSAGES, PaymentWriteError, type PaymentWriteFailure } from '../data/paymentErrors';
 import { validatePayment, type PaymentField, type PaymentFormValues } from '../data/paymentInput';
 import { NotFoundError, type DebtDetail } from '../data/source';
-import { formatRupiahInput } from '../lib/money';
+import { formatRupiah, formatRupiahInput } from '../lib/money';
 import { newUuid } from '../lib/uuid';
 
 function PaymentForm({ detail, today }: { detail: DebtDetail; today: string }) {
@@ -68,13 +68,25 @@ function PaymentForm({ detail, today }: { detail: DebtDetail; today: string }) {
           Sisa <Money value={debt.remaining_idr} size="sm" className="text-ink" />
         </p>
       </div>
-      <MoneyInput
-        label={owe ? 'Nominal dibayar' : 'Nominal diterima'}
-        value={values.amount}
-        onValueChange={set('amount')}
-        error={errors.amount}
-        readOnly={locked || busy}
-      />
+      <div className="flex flex-col gap-2">
+        <MoneyInput
+          label={owe ? 'Nominal dibayar' : 'Nominal diterima'}
+          value={values.amount}
+          onValueChange={set('amount')}
+          error={errors.amount}
+          readOnly={locked || busy}
+        />
+        {/* Paying off the whole rest is the common last step; no need to type the exact remaining amount. */}
+        {values.amount !== formatRupiahInput(String(debt.remaining_idr)) && !locked && !busy ? (
+          <button
+            type="button"
+            onClick={() => set('amount')(formatRupiahInput(String(debt.remaining_idr)))}
+            className="inline-flex min-h-12 items-center self-start text-body font-semibold underline"
+          >
+            <span className="tabular-nums">Isi sisa penuh ({formatRupiah(debt.remaining_idr)})</span>
+          </button>
+        ) : null}
+      </div>
       <TextField
         label={owe ? 'Tanggal bayar' : 'Tanggal terima'}
         type="date"

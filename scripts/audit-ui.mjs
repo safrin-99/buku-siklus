@@ -10,6 +10,7 @@ import { findChromium, waitForServer } from './lib/browser.mjs';
 const PORT = 4173;
 const BASE = `http://127.0.0.1:${PORT}`;
 const HENDRA = '20000000-0000-4000-8000-000000000001';
+const BUDI = '20000000-0000-4000-8000-000000000006';
 const ARISAN = '20000000-0000-4000-8000-000000000004';
 // Fixture payment ids are synthetic (pay-N); pick Hendra's first real payment for the payment detail screen.
 const fixture = JSON.parse(readFileSync(new URL('../src/data/fixtures.generated.json', import.meta.url), 'utf8'));
@@ -39,6 +40,20 @@ const ROUTES = [
   '/pengaturan/gajian?fixture=loading',
   '/pengaturan/gajian?fixture=error',
   '/pengaturan/kata-sandi',
+  '/tambah',
+  '/tambah?jenis=piutang',
+  `/catatan/${HENDRA}/ubah`,
+  `/catatan/${BUDI}/ubah`,
+  '/catatan/tidak-ada/ubah',
+  `/catatan/${HENDRA}/ubah?fixture=error`,
+  '/kalender',
+  '/kalender?bulan=2026-11',
+  '/kalender?bulan=2026-10&tanggal=2026-10-11',
+  '/kalender?fixture=empty',
+  '/kalender?fixture=loading',
+  '/kalender?fixture=error',
+  '/kotak-masuk',
+  '/kotak-masuk?fixture=empty',
   '/pengaturan?fixture=emailpending',
   '/pengaturan/email',
   '/pengaturan/email?fixture=emailpending',
@@ -191,6 +206,59 @@ const INTERACTIONS = [
     },
   },
   {
+    route: '/tambah',
+    name: 'tambah',
+    run: async function* (page) {
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByText('Isi nama orang atau pihaknya.').waitFor();
+      assert.equal(await page.getByLabel('Berutang kepada').evaluate((el) => el === document.activeElement), true, 'fokus ke kolom salah pertama');
+      yield 'validasi-kosong';
+      await page.getByLabel('Berutang kepada').fill('Motor');
+      await page.getByLabel('Nominal total').fill('1000000');
+      await page.getByText('Cicilan bulanan').click();
+      await page.getByLabel('Jumlah cicilan').fill('12');
+      await page.getByLabel('Jatuh tempo cicilan pertama').fill('2026-11-25');
+      await page.getByRole('list', { name: 'Jadwal cicilan' }).getByText('Rp83.337').waitFor();
+      yield 'cicilan-pratinjau';
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByText('Menyimpan…').waitFor();
+      yield 'menyimpan';
+      await page.getByText('Mode contoh: perubahan tidak disimpan.').waitFor();
+      yield 'galat';
+    },
+  },
+  {
+    route: `/catatan/${BUDI}/ubah`,
+    name: 'ubah',
+    run: async function* (page) {
+      await page.getByLabel('Nama').fill('');
+      await page.getByRole('button', { name: 'Simpan perubahan' }).click();
+      await page.getByText('Isi nama orang atau pihaknya.').waitFor();
+      yield 'validasi';
+      await page.getByRole('button', { name: 'Hapus catatan' }).click();
+      await page.getByText('akan dihapus permanen').waitFor();
+      yield 'konfirmasi-hapus';
+      await page.getByRole('button', { name: 'Ya, hapus catatan' }).click();
+      await page.getByText('Mode contoh: perubahan tidak disimpan.').waitFor();
+      yield 'hapus-galat';
+    },
+  },
+  {
+    route: '/kalender',
+    name: 'kalender',
+    run: async function* (page) {
+      await page.getByRole('button', { name: /^Minggu, 11 Oktober 2026/ }).click();
+      await page.getByRole('region', { name: 'Agenda' }).getByText('dr. Hendra').waitFor();
+      yield 'pilih-terlambat';
+      await page.getByRole('button', { name: /^Selasa, 13 Oktober 2026/ }).click();
+      await page.getByText('Tidak ada tagihan di tanggal ini.').waitFor();
+      yield 'tanggal-kosong';
+      await page.getByRole('button', { name: 'Bulan berikutnya' }).click();
+      await page.getByRole('heading', { name: 'November 2026', exact: true }).waitFor();
+      yield 'bulan-berikutnya';
+    },
+  },
+  {
     route: '/pengaturan/email',
     name: 'email',
     run: async function* (page) {
@@ -310,7 +378,9 @@ function inPage() {
   const interactive = document.querySelectorAll('a[href], button, input, select, textarea, [role="tab"], [role="button"]');
   for (const el of interactive) {
     if (!(el instanceof HTMLElement) || !visible(el)) continue;
-    const r = el.getBoundingClientRect();
+    // A visually hidden radio/checkbox inside a <label> is operated through that label: measure the label instead.
+    const wrapping = el instanceof HTMLInputElement && (el.type === 'radio' || el.type === 'checkbox') ? el.closest('label') : null;
+    const r = (wrapping ?? el).getBoundingClientRect();
     if (r.height < 44 - 0.5 || r.width < 44 - 0.5) add('target<44px', el, `${Math.round(r.width)}x${Math.round(r.height)}`);
     const name =
       el.getAttribute('aria-label') ||
