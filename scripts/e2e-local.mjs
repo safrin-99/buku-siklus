@@ -319,8 +319,11 @@ async function main() {
       await page.getByText('Email sudah diganti.').waitFor();
       assert.ok(!page.url().includes('token'), `token tersisa di URL: ${page.url()}`);
       assert.equal(new URL(page.url()).search, '?konfirmasi=selesai');
-      await page.getByRole('region', { name: 'Email saat ini' }).getByText(newEmail).waitFor();
-      assert.equal(await page.getByText('Menunggu konfirmasi').count(), 0);
+      // The pending block also shows the new address, so first wait for the refreshed account to clear it, then check
+      // the "current" line (waiting for the address alone passed before the refresh and made this step timing-dependent).
+      await page.getByText('Menunggu konfirmasi').waitFor({ state: 'detached' });
+      const current = page.getByRole('region', { name: 'Email saat ini' }).locator('p').nth(1);
+      assert.equal(await current.textContent(), newEmail);
       assert.equal((await sessionKeys()).length, 1, 'perangkat ini tetap masuk');
 
       const { data } = await createClient(stack.apiUrl, stack.adminKey, noSession).auth.admin.listUsers({ perPage: 1000 });
