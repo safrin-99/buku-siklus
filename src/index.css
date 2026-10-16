@@ -102,4 +102,16 @@
   button {
     -webkit-tap-highlight-color: transparent;
   }
+
+  /*
+   * Chrome paints autofilled inputs light blue (with !important, so a background cannot override it). An inset shadow
+   * in the field's own background (--field-bg, set by TextField) covers it, and the text stays ink.
+   */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--color-ink);
+    caret-color: var(--color-ink);
+    box-shadow: 0 0 0 1000px var(--field-bg, var(--color-surface)) inset;
+  }
 }
