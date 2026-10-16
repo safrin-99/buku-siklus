@@ -1,5 +1,6 @@
 import raw from './fixtures.generated.json';
 import { fixtureSchema, type CycleSummary } from './schemas';
+import { DebtWriteError } from './debtErrors';
 import { PaymentWriteError } from './paymentErrors';
 import { SettingsWriteError } from './settingsErrors';
 import { NotFoundError, type DataSource } from './source';
@@ -54,6 +55,11 @@ export function createFixtureSource(): DataSource {
     recordPayment: () => new Promise((_resolve, reject) => setTimeout(() => reject(new PaymentWriteError('readonly')), 1200)),
     reversePayment: () => new Promise((_resolve, reject) => setTimeout(() => reject(new PaymentWriteError('readonly')), 1200)),
     // The cycle starts on payday (cycle_bounds in SQL), so the payday is read from the generated cycle, not typed here.
+    createDebt: () => new Promise((_resolve, reject) => setTimeout(() => reject(new DebtWriteError('readonly')), 1200)),
+    updateDebtDetails: () => new Promise((_resolve, reject) => setTimeout(() => reject(new DebtWriteError('readonly')), 1200)),
+    deleteDebt: () => new Promise((_resolve, reject) => setTimeout(() => reject(new DebtWriteError('readonly')), 1200)),
+    installmentsBetween: (from, to) =>
+      gate((mode) => (mode === 'empty' ? [] : fixture.installments.filter((i) => i.due_date >= from && i.due_date <= to))),
     bookSettings: () =>
       gate(() => ({
         name: fixture.book.name,

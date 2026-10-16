@@ -4,6 +4,7 @@ import { todayInZone } from '../lib/dates';
 import { bookSchema, isUuid, pickActiveBook, type Book } from './book';
 import { mapInstallmentRow } from './mappers';
 import { bookSettingsRowSchema, cycleSummarySchema, debtMetaSchema, debtRowSchema, paymentRowSchema } from './schemas';
+import { DebtWriteError } from './debtErrors';
 import { PaymentWriteError } from './paymentErrors';
 import { SettingsWriteError } from './settingsErrors';
 import { settleWrite } from './settle';
@@ -134,6 +135,77 @@ export function createSupabaseSource(client: SupabaseClient, book: Book): DataSo
         reverses_payment_id: reversal.reversesPaymentId,
         note: reversal.note,
       }),
+
+    async createDebt(debt) {
+      const outcome = await settleWrite<PostgrestError>(
+        async () =>
+          (
+            await client.rpc('create_debt', {
+              p_id: debt.id,
+              p_book: bookId,
+              p_direction: debt.direction,
+              p_name: debt.name,
+              p_total_idr: debt.totalIdr,
+              p_installments: debt.installments.map((i) => ({ due_date: i.dueDate, amount_idr: i.amountIdr })),
+              p_description: debt.description,
+              p_category: debt.category,
+              p_memo: debt.memo,
+            })
+          ).error,
+        // A lost response may hide a committed transaction: decide by looking the id up, as for the ledger.
+        async () => {
+          const { data, error } = await client.from('debts').select('id').eq('book_id', bookId).eq('id', debt.id).maybeSingle();
+          if (error) throw error;
+          return data !== null;
+        },
+        (error) => !error.code,
+      );
+      if (outcome !== 'saved') throw new DebtWriteError(outcome);
+    },
+
+    async updateDebtDetails(debtId, update) {
+      if (!isUuid(debtId)) throw new DebtWriteError('rejected');
+      const result = await client
+        .from('debts')
+        .update({ name: update.name, description: update.description, category: update.category, memo: update.memo })
+        .eq('book_id', bookId)
+        .eq('id', debtId)
+        .select('id');
+      if (result.error) throw new DebtWriteError(result.error.code ? 'rejected' : 'network');
+      // Row-level security filters rows the user may not update instead of failing: zero rows means "not allowed".
+      if (!result.data || result.data.length !== 1) throw new DebtWriteError('rejected');
+    },
+
+    async deleteDebt(debtId) {
+      if (!isUuid(debtId)) throw new DebtWriteError('rejected');
+      const result = await client.from('debts').delete().eq('book_id', bookId).eq('id', debtId).select('id');
+      if (result.error) {
+        // 23503: payments still reference it (ON DELETE RESTRICT). The ledger is never deleted, so neither is the record.
+        if (result.error.code === '23503') throw new DebtWriteError('has_payments');
+        throw new DebtWriteError(result.error.code ? 'rejected' : 'network');
+      }
+      if (result.data && result.data.length === 1) return;
+      // Zero rows: already deleted (a retry after a lost response), not visible to this user (for them it does not exist,
+      // so nothing was deleted), or visible but not allowed (viewer): only the last one is a failure.
+      const { data, error } = await client.from('debts').select('id').eq('book_id', bookId).eq('id', debtId).maybeSingle();
+      if (error) throw new DebtWriteError('unknown');
+      if (data !== null) throw new DebtWriteError('rejected');
+    },
+
+    async installmentsBetween(from, to) {
+      const rows = unwrap(
+        await client
+          .from('installment_status')
+          .select(COLUMNS.installment)
+          .eq('book_id', bookId)
+          .gte('due_date', from)
+          .lte('due_date', to)
+          .order('due_date')
+          .order('debt_id')
+          .order('seq'),
+      );
+      return rows.map(mapInstallmentRow);
+    },
 
     async bookSettings() {
       const rows = z.array(bookSettingsRowSchema).parse(unwrap(await client.from('books').select(COLUMNS.bookSettings).eq('id', bookId)));

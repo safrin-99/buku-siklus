@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDataSource } from './context';
+import { DebtWriteError } from './debtErrors';
 import { PaymentWriteError } from './paymentErrors';
 import { SettingsWriteError } from './settingsErrors';
-import type { BookSettingsUpdate, NewPayment, NewReversal } from './source';
+import type { BookSettingsUpdate, DebtDetailsUpdate, NewDebt, NewPayment, NewReversal } from './source';
 
 // Query keys always start with the book id: another book's data is never reused from the cache.
 
@@ -89,6 +90,54 @@ export function useUpdateBookSettings() {
       assertOnline(() => new SettingsWriteError('offline'));
       await source.updateBookSettings(update);
     },
+    onSettled: () => client.invalidateQueries({ queryKey: [source.bookId] }),
+  });
+}
+
+/** Installments due in [from, to] for the calendar. Invalidated with everything else of the book after any write. */
+export function useInstallmentsBetween(from: string, to: string) {
+  const source = useDataSource();
+  return useQuery({ queryKey: [source.bookId, 'installments', from, to], queryFn: () => source.installmentsBetween(from, to) });
+}
+
+/** Record writes follow the ledger's rules: no hidden offline queue, and everything for the book is refetched after. */
+export function useCreateDebt() {
+  const source = useDataSource();
+  const client = useQueryClient();
+  return useMutation({
+    networkMode: 'always',
+    mutationFn: async (debt: NewDebt) => {
+      assertOnline(() => new DebtWriteError('offline'));
+      await source.createDebt(debt);
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: [source.bookId] }),
+  });
+}
+
+export function useUpdateDebtDetails(debtId: string) {
+  const source = useDataSource();
+  const client = useQueryClient();
+  return useMutation({
+    networkMode: 'always',
+    mutationFn: async (update: DebtDetailsUpdate) => {
+      assertOnline(() => new DebtWriteError('offline'));
+      await source.updateDebtDetails(debtId, update);
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: [source.bookId] }),
+  });
+}
+
+export function useDeleteDebt(debtId: string) {
+  const source = useDataSource();
+  const client = useQueryClient();
+  return useMutation({
+    networkMode: 'always',
+    mutationFn: async () => {
+      assertOnline(() => new DebtWriteError('offline'));
+      await source.deleteDebt(debtId);
+    },
+    // The detail of a deleted record would 404 on refetch: drop it, refetch the rest.
+    onSuccess: () => client.removeQueries({ queryKey: [source.bookId, 'debt-detail', debtId] }),
     onSettled: () => client.invalidateQueries({ queryKey: [source.bookId] }),
   });
 }
