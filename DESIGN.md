@@ -8,6 +8,7 @@ colors:
   surface-inset: '#F4F1EA'
   border: '#E7E3DA'
   border-strong: '#CFC9BC'
+  border-field: '#8A8478'
   ink: '#1E1B4B'
   ink-2: '#4B5563'
   muted: '#6B7280'
@@ -29,6 +30,8 @@ colors:
 typography:
   font-family: Plus Jakarta Sans
   money-hero:   {size: 32px, weight: 700, line: 38px, tracking: -0.02em, numeric: tabular}
+  brand:        {size: 40px, weight: 700, line: 42px, tracking: -0.03em}   # wordmark layar Masuk saja
+  brand-lg:     {size: 56px, weight: 700, line: 58px, tracking: -0.035em}  # wordmark layar Masuk: ponsel tinggi dan >= 768px
   display:      {size: 32px, weight: 700, line: 38px, tracking: -0.02em}
   money-lg:     {size: 20px, weight: 700, line: 26px, tracking: -0.01em, numeric: tabular}
   money-md:     {size: 16px, weight: 600, line: 22px, numeric: tabular}
@@ -93,6 +96,7 @@ Setiap aturan di bawah dipakai sebagai kriteria lolos/gagal saat meninjau desain
 | Permukaan kartu/baris | `surface` | #FFFFFF | |
 | Area cekung (input, segmented) | `surface-inset` | #F4F1EA | |
 | Garis | `border` | #E7E3DA | dekoratif, bukan pembawa informasi |
+| Garis kolom isian | `border-field` | #8A8478 | 3,72:1 pada `surface`, 3,53:1 pada `canvas` (WCAG 1.4.11 butuh 3:1 untuk batas komponen; `border-strong` hanya 1,65:1) |
 | Teks utama, tombol | `ink` | #1E1B4B | 15,2:1 di atas `canvas` |
 | Teks pendukung | `ink-2` | #4B5563 | di atas 7:1 pada `surface` |
 | Teks sekunder terkecil | `muted` | #6B7280 | 4,83:1 pada `surface`, 4,60:1 pada `canvas`. **Gagal (4,29:1) pada `surface-inset`**, jadi di atas area cekung pakai `ink-2` |
@@ -111,12 +115,15 @@ Font: Plus Jakarta Sans, dimuat mandiri (bukan CDN). **Verifikasi sebelum dikunc
 - Semua nominal Rupiah: `font-variant-numeric: tabular-nums`.
 - Format: `Rp1.554.329` (tanpa spasi, titik pemisah ribuan, tanpa desimal). Nilai negatif memakai tanda minus sebenarnya (U+2212): `−Rp600.000`.
 - Ukuran teks minimum 12px. Tidak ada 10px atau 11px.
+- `brand`/`brand-lg` hanya untuk wordmark `Buku Siklus` di sampul layar Masuk. Tidak dipakai untuk judul atau angka.
 - `section` (huruf kapital 13px) hanya untuk judul seksi. Jangan dipakai untuk badge.
 - Tanggal: `Sab, 25 Okt`. Tahun hanya muncul jika bukan tahun berjalan. Relatif di samping: `10 hari lagi`, `lewat 4 hari`, `hari ini`.
 
 ## 5. Tata letak
 
 - Lebar desain 360 sampai 412px, fluid. Margin sisi 16px. Pada layar lebar, konten dipusatkan dengan lebar maks 480px.
+- Pengecualian: layar Masuk (di luar alur utama) memakai margin 24px dan, mulai 768px, dua kolom (lihat bagian 11 butir 16).
+- Tidak ada tinggi tetap untuk blok konten: tinggi mengikuti isi (`min-h-dvh` hanya untuk wadah layar), sehingga viewport pendek atau zoom tidak memotong apa pun.
 - Ritme: jarak antarseksi 24px, padding baris 14px vertikal, kelipatan 4px.
 - Tap target minimum 48px. Jarak antar-target minimal 8px.
 - Navigasi bawah, 5 slot: **Beranda, Catatan, [+], Kotak Masuk, Kalender.** Kotak Masuk menampilkan angka jumlah item menunggu. **Pengaturan** diakses dari ikon roda gigi di header kanan atas, bukan tab.
@@ -136,9 +143,9 @@ Isi, berurutan: baris kecil `Siklus 1 Okt – 31 Okt`; label `Sisa setelah cicil
 
 **Segmented control** (Utang | Piutang): wadah `surface-inset`, segmen aktif putih dengan border, tinggi 44px. Label tidak boleh pecah dua baris. Jika sempit, gunakan label pendek.
 
-**Tombol.** Primer: latar `primary`, teks putih, tinggi 52px, radius 12. Sekunder: `surface` + border `border-strong`, teks `ink`. Destruktif: teks `status-overdue-text` di atas `status-overdue-bg`. Tekan: skala 0,98 dan `primary-pressed`.
+**Tombol.** Primer: latar `primary`, teks putih, tinggi 52px, radius 12. Sekunder: `surface` + border `border-strong`, teks `ink`. Destruktif: teks `status-overdue-text` di atas `status-overdue-bg`. Status: tekan = skala 0,98 + `primary-pressed`; hover = `primary-pressed` (sekunder: `surface-inset`) hanya pada perangkat ber-pointer (`@media (hover: hover)`), supaya ketukan di ponsel tidak meninggalkan warna hover; fokus keyboard = garis 2px `primary-pressed` berjarak 2px; memproses = ikon putar 20px (berhenti berputar bila gerak dikurangi) + teks `Memproses…`, `aria-busy`, dan tombol dinonaktifkan sehingga kiriman ganda tidak mungkin.
 
-**Input.** Tinggi 52px, radius 12, border 1,5px `border-strong`, fokus `primary-pressed` + ring. Input nominal: awalan `Rp` terkunci, pemisah ribuan otomatis. Placeholder memakai `muted`. Varian `filled` (hanya layar Masuk): latar `surface-inset` tanpa garis, garis `primary-pressed` + ring saat fokus, ikon 20px `ink-2` di kiri. Elemen input menutupi seluruh kotak (awalan, ikon, dan tombol menumpang di padding-nya), dan warna autofill Chrome ditutup dengan latar kolom itu sendiri, supaya kolom yang diisi otomatis tidak tampil sebagai potongan biru di tengah kotak.
+**Input.** Tinggi 52px, radius 12, border 1,5px `border-field`, latar `surface`. Label selalu di atas (placeholder bukan label). Ikon opsional 20px `ink-2` di kiri (dekoratif, disembunyikan dari pembaca layar). Fokus: garis `primary-pressed` + ring. Galat: garis `ink` + pesan tebal dengan ikon di bawah kolom (bukan merah, bukan hanya warna); kolom terhubung ke pesan lewat `aria-describedby` dan `aria-invalid`, dan saat kirim gagal validasi fokus pindah ke kolom salah yang pertama. Saat memproses kolom `readOnly`. Input nominal: awalan `Rp` terkunci, pemisah ribuan otomatis. Placeholder memakai `muted`. Elemen input menutupi seluruh kotak (awalan, ikon, dan tombol menumpang di padding-nya), dan warna autofill Chrome ditutup dengan latar kolom itu sendiri, supaya kolom yang diisi otomatis tidak tampil sebagai potongan biru di tengah kotak.
 
 **Kolom Konfirmasi (layar tambah cepat dan Kotak Masuk).** Label kecil di atas, nilai di bawah, bisa diedit. Hanya kolom dengan keyakinan rendah ditandai chip kecil netral `Periksa` dan border `status-due-mark`. Kolom yang yakin tampil biasa, tanpa lencana "Terverifikasi".
 
@@ -229,7 +236,7 @@ Penyesuaian saat implementasi (15 Okt 2026, diverifikasi di 360px dan 412px):
 Penambahan saat membangun login (15 Okt 2026, diverifikasi di 360px dan 412px):
 
 15. **Akun di Pengaturan.** Satu-satunya mitigasi "HP hilang" yang disebut CLAUDE.md adalah sesi yang bisa dicabut, jadi `Keluar` dan `Keluar dari semua perangkat` ada di Pengaturan, bagian `Akun`. (Sejak butir 25, email ditampilkan sebagai baris `Email`, bukan teks `Masuk sebagai`.) Yang kedua bertombol destruktif dan meminta konfirmasi satu langkah yang menjelaskan akibatnya. Bagian Pengaturan yang belum dibangun dinyatakan jujur di layar (`Pengaturan lain belum dibangun.`).
-16. **Layar Masuk** (di luar tujuh layar utama; revisi 16 Okt 2026 setelah versi tipografis dinilai kurang modern, terutama kolomnya): pita penuh `ink` di atas seperti sampul buku kas, berisi glif aplikasi (gambar yang sama dengan favicon, tanpa kotak) + `Buku Siklus` dan judul `Masuk` (token `display`) berwarna `on-ink`, rata kiri. Di bawahnya halaman putih (`surface`) dengan sudut atas radius `sheet` yang menumpang pada pita, tanpa bayangan. Isi halaman: `Email` dan `Kata sandi` memakai Input varian `filled` dengan ikon amplop/gembok (kata sandi juga punya tombol tampilkan/sembunyikan berukuran ketuk 48px), lalu tombol primer `Masuk` tepat di bawah kolom. Selama layar ini terbuka, `theme-color` mengikuti `ink` (dibaca dari token) agar bilah browser menyatu dengan pita. Tombol **tidak** ditempel ke dasar layar: Chrome di Android tidak mengecilkan layout saat keyboard muncul, sehingga tombol di dasar akan tertutup keyboard. Tanpa tagline, tanpa kartu di tengah, tanpa pendaftaran dan tanpa "lupa kata sandi": akun dikelola lewat dashboard Supabase, dan hal itu tidak dijelaskan di layar. Keyboard: `Email` memakai tombol `next`, `Kata sandi` memakai `go` (Enter mengirim form).
+16. **Layar Masuk** (di luar tujuh layar utama; revisi ke-4, 16 Okt 2026). Konsep: **sampul buku kas** lalu halaman yang dibuka. Ponsel: sampul `ink` berisi glif aplikasi (gambar yang sama dengan favicon, tanpa kotak, tinggi 36px, rata kiri) di atas dan wordmark `Buku` / `Siklus` dua baris di bawah (`brand` 40px; `brand-lg` 56px bila tinggi layar ≥ 760px). Sampul mengambil sisa tinggi yang tidak dipakai form, jadi form duduk di bawah (dekat jempol) dan tidak ada ruang kosong di bawah tombol; di layar pendek sampul menyusut ke isinya. Halaman putih (`surface`) bersudut atas radius `sheet` menumpang pada sampul, tanpa bayangan, berisi judul `Masuk` (`title`), satu kalimat bantuan `Gunakan email dan kata sandi akun kamu.` (`body`, `ink-2`), kolom `Email` (ikon amplop, `autocomplete=username` karena itu pengenal masuk yang dipasangkan pengelola sandi dengan `current-password`) dan `Kata sandi` (ikon gembok, tombol tampilkan/sembunyikan 48px, petunjuk `Caps Lock aktif.` saat Caps Lock menyala), lalu tombol primer `Masuk` tepat di bawah kolom. Mulai 768px: dua kolom, sampul 5/12 lebar di kiri (wordmark `brand-lg`), form di kanan dipusatkan vertikal dengan lebar maks 384px dan judul `display`. Galat: kosong/format email salah ditandai per kolom sebelum dikirim; penolakan server tampil sebagai `FormAlert` dengan pesan generik yang sama untuk email dan sandi salah. Selama layar ini terbuka, `theme-color` mengikuti `ink` (dibaca dari token). Tombol tidak ditempel ke dasar layar (Chrome Android tidak mengecilkan layout saat keyboard muncul; kolom yang difokus digeser ke atas keyboard oleh browser, dan Enter pada `Kata sandi` mengirim). Tanpa tagline, kartu di tengah, ilustrasi, gradient, atau bayangan. Tanpa pendaftaran dan tanpa "lupa kata sandi" karena aplikasi belum punya alur pemulihan; tautan yang tidak berfungsi tidak ditampilkan.
 17. **Kolom isian dan galat formulir.** Galat per kolom memakai garis tepi `ink`, ikon, dan teks tebal, bukan warna merah, supaya aturan "warna berarti status" tetap utuh.
 
 Penambahan saat membangun Catat pembayaran (15 Okt 2026, diverifikasi di 360px dan 412px):

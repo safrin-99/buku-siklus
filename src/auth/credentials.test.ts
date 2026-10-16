@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateEmailChange, validatePasswordChange } from './credentials';
+import { validateEmailChange, validatePasswordChange, validateSignIn } from './credentials';
 
 const ok = { current: 'sandi-lama-123', next: 'sandi-baru-456', confirm: 'sandi-baru-456' };
 
@@ -84,5 +84,29 @@ describe('validateEmailChange', () => {
       ok: false,
       errors: { newEmail: 'Ini email yang sedang dipakai.' },
     });
+  });
+});
+
+describe('validateSignIn', () => {
+  it('lolos: email dirapikan spasinya, kata sandi apa adanya', () => {
+    expect(validateSignIn({ email: ' pemilik@contoh.id ', password: ' sandi ' })).toEqual({
+      ok: true,
+      value: { email: 'pemilik@contoh.id', password: ' sandi ' },
+    });
+  });
+
+  it('kosong: tiap kolom punya pesannya sendiri', () => {
+    expect(validateSignIn({ email: '  ', password: '' })).toEqual({
+      ok: false,
+      errors: { email: 'Isi email.', password: 'Isi kata sandi.' },
+    });
+  });
+
+  it('format email jelas salah ditandai sebelum dikirim; kata sandi tidak diperiksa isinya', () => {
+    expect(validateSignIn({ email: 'pemilik', password: 'x' })).toEqual({
+      ok: false,
+      errors: { email: 'Format email belum benar. Contoh: nama@gmail.com.' },
+    });
+    expect(validateSignIn({ email: 'a@b.id', password: 'x' }).ok).toBe(true);
   });
 });

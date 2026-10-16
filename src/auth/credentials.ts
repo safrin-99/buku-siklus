@@ -45,8 +45,30 @@ export type EmailChangeValidation =
   | { ok: true; value: EmailChangeValues }
   | { ok: false; errors: Partial<Record<EmailChangeField, string>> };
 
-// Deliberately loose: the server has the final say; this only catches obvious typos before an email is sent.
+// Deliberately loose: the server has the final say; this only catches obvious typos before a request is sent.
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export interface SignInValues {
+  email: string;
+  password: string;
+}
+
+export type SignInField = keyof SignInValues;
+
+export type SignInValidation =
+  | { ok: true; value: SignInValues }
+  | { ok: false; errors: Partial<Record<SignInField, string>> };
+
+/** Checks only what is visible before sending; a wrong email or password is still answered by the server, generically. */
+export function validateSignIn(values: SignInValues): SignInValidation {
+  const errors: Partial<Record<SignInField, string>> = {};
+  const email = values.email.trim();
+  if (email === '') errors.email = 'Isi email.';
+  else if (!EMAIL_SHAPE.test(email)) errors.email = 'Format email belum benar. Contoh: nama@gmail.com.';
+  if (values.password === '') errors.password = 'Isi kata sandi.';
+  if (Object.keys(errors).length > 0) return { ok: false, errors };
+  return { ok: true, value: { email, password: values.password } };
+}
 
 /** The new email is trimmed and lower-cased, as Supabase Auth stores it. */
 export function validateEmailChange(values: EmailChangeValues, currentEmail: string): EmailChangeValidation {

@@ -40,7 +40,7 @@ scripts/                 # gen-fixtures.mjs, audit-ui.mjs, e2e-local.mjs, lib/br
 
 ## Perintah
 
-- `pnpm dev`, `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test` (vitest, 140 tes termasuk uji kontrak SQL → Zod)
+- `pnpm dev`, `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test` (vitest, 143 tes termasuk uji kontrak SQL → Zod)
 - Env (`.env.local`, lihat `.env.example`): `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (hanya kunci publishable/anon). Build produksi **gagal** bila env kosong atau berisi kunci rahasia (`sb_secret_`/`service_role`). Data contoh hanya lewat `pnpm dev:fixture` (`--mode fixture`); build biasa tidak memuatnya.
 - `pnpm test:db` (17 tes skema + RLS + ledger + fixture tidak basi, PGlite, ±50 detik)
 - `pnpm test:local` (50 tes integrasi ke Supabase lokal sungguhan: GoTrue + PostgREST + RLS lewat HTTP, termasuk tulis ledger dengan gangguan jaringan yang disuntikkan dan ganti email dengan tautan asli dari Mailpit; butuh Docker dan `supabase start` termasuk Mailpit; menolak URL non-lokal karena ledger tidak bisa dihapus)

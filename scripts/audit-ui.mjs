@@ -59,12 +59,27 @@ const INTERACTIONS = [
     route: '/masuk?fixture=signedout',
     name: 'masuk',
     run: async function* (page) {
+      const email = page.getByLabel('Email');
+      const password = page.getByLabel('Kata sandi', { exact: true });
       await page.getByRole('button', { name: 'Masuk', exact: true }).click();
+      await page.getByText('Isi email.').waitFor();
+      await page.getByText('Isi kata sandi.').waitFor();
+      assert.equal(await email.evaluate((el) => el === document.activeElement), true, 'fokus pindah ke kolom pertama yang salah');
       yield 'validasi-kosong';
-      await page.getByLabel('Email').fill('pemilik@contoh.id');
-      await page.getByLabel('Kata sandi', { exact: true }).fill('rahasia-contoh');
-      await page.getByRole('button', { name: 'Masuk', exact: true }).click();
+      await email.fill('pemilik');
+      assert.equal(await page.getByText('Isi email.').count(), 0, 'mengetik menghapus pesan kolom itu');
+      await password.fill('rahasia-contoh');
+      await password.press('Enter'); // keyboard submit
+      await page.getByText('Format email belum benar. Contoh: nama@gmail.com.').waitFor();
+      yield 'format-email';
+      await page.getByRole('button', { name: 'Tampilkan kata sandi' }).click();
+      assert.equal(await password.getAttribute('type'), 'text', 'tombol mata menampilkan sandi');
+      await page.getByRole('button', { name: 'Sembunyikan kata sandi' }).click();
+      assert.equal(await password.getAttribute('type'), 'password', 'tombol mata menyembunyikan lagi');
+      await email.fill('pemilik@contoh.id');
+      await password.press('Enter');
       await page.getByText('Memproses…').waitFor();
+      assert.equal(await page.getByRole('button', { name: 'Memproses…' }).isDisabled(), true, 'tombol terkunci saat memproses');
       yield 'memproses';
       await page.getByText('Mode contoh: tindakan ini tidak tersedia.').waitFor();
       yield 'galat';
