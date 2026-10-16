@@ -16,7 +16,11 @@ export interface AuthService {
   readonly kind: 'fixture' | 'supabase';
   onChange(listener: (user: AuthUser | null) => void): () => void;
   signIn(email: string, password: string): Promise<void>;
-  /** `global` revokes every session of this account on every device. */
+  /**
+   * `local` ends this device's session; it succeeds offline too (the session is removed here, the server is told when
+   * reachable). `global` revokes every session of this account first and fails, leaving this device signed in, if that
+   * cannot be confirmed. Throws only while this device is still signed in.
+   */
   signOut(scope: 'local' | 'global'): Promise<void>;
   /**
    * Checks the current password first, then sets the new one. Supabase Auth then revokes every OTHER session of the
@@ -70,8 +74,16 @@ export function createSupabaseAuthService(client: SupabaseClient): AuthService {
     },
     async signOut(scope) {
       try {
-        const { error } = await client.auth.signOut({ scope });
-        if (error) throw error;
+        if (scope === 'global') {
+          // supabase-js removes the local session even when /logout fails (e.g. offline), so signOut({ scope: 'global' })
+          // could fail while looking like success: this device signed out, every other device still signed in.
+          // 'others' never removes the local session; only once it succeeded does this device sign out too.
+          const { error } = await client.auth.signOut({ scope: 'others' });
+          if (error) throw error;
+        }
+        const { error } = await client.auth.signOut({ scope: 'local' });
+        // A failed /logout still removes the local session; only a session left on this device is a failure.
+        if (error && (await client.auth.getSession()).data.session) throw error;
       } catch (error) {
         throw new AuthFailure(classifyAuthError(error));
       }

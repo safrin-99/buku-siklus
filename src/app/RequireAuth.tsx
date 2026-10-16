@@ -10,7 +10,10 @@ export function RequireAuth() {
 
   if (state.status === 'loading') return <SessionLoading />;
   if (state.status === 'signedOut') {
-    return <Navigate to="/masuk" replace state={{ from: `${location.pathname}${location.search}` }} />;
+    // Only an unplanned loss of session (none yet, expired, revoked elsewhere) returns to the screen asked for. After
+    // Keluar, an old history entry (Back, or the reload after signing out everywhere) is not a destination.
+    const from = state.byUser ? undefined : { from: `${location.pathname}${location.search}` };
+    return <Navigate to="/masuk" replace state={from} />;
   }
   return (
     <DataGate userId={state.user.id}>

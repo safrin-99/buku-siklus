@@ -111,6 +111,67 @@ describe('keluar', () => {
     expect(refreshed.data.session).toBeNull();
   });
 
+  /** Client whose /auth/v1/logout requests fail like a lost connection while `cut()` is true. */
+  const withLogoutCut = (cut: () => boolean) =>
+    appClientWithFetch(stack, (real) => async (input, init) => {
+      const url = input instanceof Request ? input.url : String(input);
+      if (cut() && url.includes('/auth/v1/logout')) throw new TypeError('Failed to fetch');
+      return real(input, init);
+    });
+
+  it('global gagal karena jaringan: perangkat ini tetap masuk dan perangkat lain tidak tercabut (tidak gagal diam-diam)', async () => {
+    const email = uniqueEmail('pemilik');
+    await createOwner(admin, email);
+    let cut = true;
+    const phone = withLogoutCut(() => cut);
+    const laptop = appClient(stack);
+    const service = createSupabaseAuthService(phone);
+    await service.signIn(email, TEST_PASSWORD);
+    await createSupabaseAuthService(laptop).signIn(email, TEST_PASSWORD);
+
+    const failure = await failureOf(service.signOut('global'));
+    expect(failure.kind).toBe('offline');
+    // supabase-js alone would have removed this session and reported nothing revoked as a mere error.
+    expect((await phone.auth.getSession()).data.session).not.toBeNull();
+    expect((await laptop.auth.refreshSession()).error).toBeNull();
+
+    // Retry once the connection is back: every session is revoked, then this one ends.
+    cut = false;
+    await service.signOut('global');
+    expect((await phone.auth.getSession()).data.session).toBeNull();
+    expect((await laptop.auth.refreshSession()).error).not.toBeNull();
+  });
+
+  it('local gagal karena jaringan: sesi perangkat ini tetap berakhir dan signOut tidak melempar', async () => {
+    const email = uniqueEmail('pemilik');
+    await createOwner(admin, email);
+    const phone = withLogoutCut(() => true);
+    const service = createSupabaseAuthService(phone);
+    const seen: Array<AuthUser | null> = [];
+    const stop = service.onChange((user) => seen.push(user));
+    await service.signIn(email, TEST_PASSWORD);
+    await expect.poll(() => seen.at(-1)?.email).toBe(email);
+
+    await service.signOut('local');
+    expect((await phone.auth.getSession()).data.session).toBeNull();
+    expect(seen.at(-1)).toBeNull();
+    stop();
+  });
+
+  it('global setelah sesi perangkat ini dicabut dari perangkat lain: perangkat ini tetap keluar', async () => {
+    const email = uniqueEmail('pemilik');
+    await createOwner(admin, email);
+    const phone = appClient(stack);
+    const laptop = appClient(stack);
+    await createSupabaseAuthService(phone).signIn(email, TEST_PASSWORD);
+    await createSupabaseAuthService(laptop).signIn(email, TEST_PASSWORD);
+    await createSupabaseAuthService(laptop).signOut('global');
+
+    // The phone's access token still verifies, but its session is gone server side (403, ignored by supabase-js).
+    await createSupabaseAuthService(phone).signOut('global');
+    expect((await phone.auth.getSession()).data.session).toBeNull();
+  });
+
   it('batasan JWT: setelah sesi dicabut, GoTrue menolak token lama tetapi REST masih menerimanya sampai kedaluwarsa', async () => {
     const email = uniqueEmail('pemilik');
     await createOwner(admin, email);

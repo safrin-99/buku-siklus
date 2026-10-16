@@ -68,6 +68,15 @@ export function Masuk() {
   useInkBrowserBar();
 
   if (state.status === 'signedIn') return <Navigate to={targetAfterLogin(location.state)} replace />;
+  // While the stored session is read (or refreshed over the network), the form is not shown yet: a signed-in user
+  // would otherwise see it flash before the redirect. The ink background matches the screen that usually follows.
+  if (state.status === 'loading') {
+    return (
+      <div role="status" aria-busy="true" className="min-h-dvh bg-primary">
+        <span className="sr-only">Memeriksa sesi…</span>
+      </div>
+    );
+  }
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
