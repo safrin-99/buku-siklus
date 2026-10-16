@@ -59,6 +59,7 @@ elevation:
   fab: '0 6px 16px rgba(30, 27, 75, 0.25)'
 motion:
   duration: 150ms
+  page: 180ms (layar baru: opasitas 0→1 + geser 4px ke atas, cubic-bezier(0.2, 0, 0, 1))
   press-scale: 0.98
   reduced-motion: wajib dihormati (tanpa animasi selain perubahan opasitas)
 ---
@@ -261,6 +262,13 @@ Penambahan saat membangun fitur inti (16 Okt 2026, diverifikasi di 360px dan 412
 30. **Kotak Masuk**: penangkap notifikasi dan layar konfirmasi belum dibangun, jadi layar ini menyatakannya (`Belum ada notifikasi yang masuk.` atau `N notifikasi menunggu, tetapi layar konfirmasinya belum dibangun.`) dengan aksi `Tambah catatan manual`. Subjudul `N menunggu konfirmasi` hanya tampil setelah jumlahnya diketahui, sehingga selalu sama dengan lencana navigasi.
 31. **Beranda**: bila ada cicilan utang dari siklus sebelumnya yang belum dibayar, kartu siklus menambahkan satu baris `Belum termasuk tunggakan siklus lalu Rp…`. Angka utama tetap `gaji − kewajiban siklus ini` (bagian 9); tunggakan dinyatakan di sampingnya, bukan disembunyikan.
 32. **Catatan**: teks pencarian ikut disimpan di URL (`?q=`) seperti tab dan filter, sehingga bertahan setelah membuka Detail lalu kembali.
+
+Penambahan navigasi dan sesi (16 Okt 2026, diverifikasi di Chromium 360px, 412px, dan 1280px terhadap Supabase lokal):
+
+33. **Transisi layar.** Layar baru memudar masuk sekali (token `animate-page-in`, 180ms, opasitas dan geser 4px; dengan `prefers-reduced-motion` hanya opasitas, `animate-fade-in`). Navigasi bawah dan banner offline berada di luar layar yang dianimasikan: tidak ikut memudar dan tidak dipasang ulang saat pindah tab. Ketukan cepat berturut-turut hanya menyisakan layar terakhir (tidak ada animasi bertumpuk). Mengganti parameter pencarian saja (filter, bulan kalender) tidak memutar ulang transisi. Tidak ada `transition: all`, tidak ada pustaka animasi; animasi tidak meninggalkan transform setelah selesai.
+34. **Posisi gulir.** Layar baru (termasuk pindah tab) selalu dibuka dari atas. Back/Forward kembali ke posisi gulir entri itu. Mengganti parameter pencarian saja tidak menggulir.
+35. **Sesudah Keluar.** Masuk berikutnya di tab itu selalu mendarat di **Beranda**, tidak di Pengaturan atau layar lain dari sebelum Keluar (juga bila pengguna menekan Back ke layar lama lalu masuk). Hanya sesi yang hilang tanpa sengaja (belum masuk, kedaluwarsa, dicabut dari perangkat lain) yang kembali ke layar yang diminta setelah masuk, mis. tautan langsung ke `/kalender` di tab baru. Selama sesi diperiksa, layar Masuk hanya menampilkan latar tinta (tanpa formulir), jadi pengguna yang sudah masuk tidak melihat formulir berkedip.
+36. **Keluar dari semua perangkat** tidak boleh gagal diam-diam: bila server tak terjangkau, layar tetap di Pengaturan dengan pesan `Tidak tersambung ke server. Periksa koneksi, lalu coba lagi.` dan perangkat ini tetap masuk, sehingga bisa diulang. `Keluar` biasa tetap berhasil saat offline (sesi di perangkat ini dihapus).
 
 ## 12. Buku (celah desain, belum divisualkan Stitch)
 

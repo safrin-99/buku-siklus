@@ -22,8 +22,8 @@ export default defineConfig([
     languageOptions: { globals: globals.node },
   },
   {
-    // inPage() dijalankan di dalam browser oleh Playwright, jadi memakai global DOM.
-    files: ['scripts/audit-ui.mjs'],
+    // Fungsi yang dikirim ke page.evaluate()/addInitScript() dijalankan di dalam browser oleh Playwright, jadi memakai global DOM.
+    files: ['scripts/audit-ui.mjs', 'scripts/e2e-local.mjs'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
 ]);

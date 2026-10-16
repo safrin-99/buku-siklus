@@ -128,6 +128,14 @@ async function main() {
       assert.ok(consoleErrors.length > 0 && consoleErrors.every((m) => m.includes('status of 400')), consoleErrors.join(' | '));
       consoleErrors = [];
     };
+    // An aborted request on purpose (route.abort) is logged by the browser; only lines matching `pattern` are allowed.
+    const expectConsole = async (pattern, attempt) => {
+      assert.deepEqual(consoleErrors, [], `galat konsol tak terduga: ${consoleErrors.join(' | ')}`);
+      await attempt();
+      assert.ok(consoleErrors.every((m) => pattern.test(m)), consoleErrors.join(' | '));
+      consoleErrors = [];
+    };
+    const routeState = (p = page) => p.evaluate(() => window.history.state?.usr ?? null);
     const sessionKeys = () => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('sb-') && k.endsWith('-auth-token')));
     const login = async (password) => {
       await page.getByLabel('Email').fill(email);
@@ -417,6 +425,92 @@ async function main() {
       assert.ok(!(await page.locator('body').innerText()).includes('Sisa kas setelah cicilan'));
     });
 
+    // ---- Navigation: rapid tab switches, scroll, history, motion ----
+    // The routed screen (RoutedScreen in Layouts.tsx): exactly one at any time, outside it the bottom navigation.
+    const screen = page.locator('[class*="animate-page-in"]');
+    const screenStyle = () =>
+      screen.evaluate((el) => {
+        const cs = getComputedStyle(el);
+        return { name: cs.animationName, duration: cs.animationDuration, opacity: cs.opacity, transform: cs.transform };
+      });
+
+    await step('Navigasi: pindah tab cepat berakhir di tab terakhir (URL, tab aktif, satu layar, transisi tuntas tanpa sisa transform); BottomNav tidak dipasang ulang; layar baru mulai dari atas; Back/Forward memulihkan posisi; ganti bulan tidak memutar ulang transisi; gerak dikurangi = hanya opasitas', async () => {
+      // Enough rows to scroll at 360×640. Far-future due dates: no effect on this cycle or on overdue lists.
+      const { data: ref, error: refError } = await owner.from('debts').select('book_id').eq('id', debtId).single();
+      if (refError) throw new Error(refError.message);
+      for (let i = 1; i <= 12; i += 1) {
+        const { data: d, error } = await owner
+          .from('debts')
+          .insert({ book_id: ref.book_id, direction: 'owe', name: `Gulir E2E ${String(i).padStart(2, '0')}`, total_idr: 100_000 })
+          .select('id')
+          .single();
+        if (error) throw new Error(error.message);
+        const added = await owner.from('installments').insert({ debt_id: d.id, book_id: ref.book_id, seq: 1, due_date: shift(today, 200 + i), amount_idr: 100_000 });
+        if (added.error) throw new Error(added.error.message);
+      }
+      await page.setViewportSize({ width: 360, height: 640 });
+      await page.goto(BASE + '/');
+      await page.getByRole('heading', { name: 'Beranda' }).waitFor();
+      const nav = page.getByRole('navigation', { name: 'Navigasi utama' });
+      await nav.evaluate((el) => {
+        el.dataset.e2eMark = 'tetap';
+      });
+
+      // Rapid taps without waiting for any screen in between.
+      for (const name of ['Catatan', 'Kalender', 'Beranda', 'Catatan', 'Kalender']) await nav.getByRole('link', { name, exact: true }).click();
+      await page.getByRole('heading', { name: 'Kalender', exact: true }).waitFor();
+      assert.equal(new URL(page.url()).pathname, '/kalender');
+      assert.deepEqual(await nav.locator('[aria-current="page"]').allInnerTexts(), ['Kalender']);
+      assert.equal(await nav.getAttribute('data-e2e-mark'), 'tetap', 'BottomNav dipasang ulang');
+      assert.equal(await screen.count(), 1, 'lebih dari satu layar terpasang');
+      assert.equal(await page.locator('h1').count(), 1, 'lebih dari satu judul layar');
+      await page.waitForFunction(() => document.querySelector('[class*="animate-page-in"]')?.getAnimations().length === 0);
+      assert.deepEqual(await screenStyle(), { name: 'page-in', duration: '0.18s', opacity: '1', transform: 'none' });
+
+      // A new screen starts at the top; Back/Forward return to where each entry was left.
+      await nav.getByRole('link', { name: 'Catatan', exact: true }).click();
+      const list = page.getByRole('list', { name: 'Daftar utang' });
+      await list.getByText('Gulir E2E 12').waitFor();
+      await page.evaluate(() =>
+        document.addEventListener('click', () => (window.__yAtClick = window.scrollY), { capture: true, once: true }),
+      );
+      await list.getByText('Gulir E2E 12').click();
+      await page.getByRole('heading', { name: 'Gulir E2E 12' }).waitFor();
+      const yAtClick = await page.evaluate(() => window.__yAtClick);
+      assert.ok(yAtClick > 300, `daftar seharusnya tergulir saat diklik (${yAtClick})`);
+      assert.equal(await page.evaluate(() => window.scrollY), 0, 'detail harus dibuka dari atas');
+      const backTo = (y) => page.waitForFunction((target) => Math.abs(window.scrollY - target) <= 2, y, { timeout: 3000 });
+      await page.goBack();
+      await list.getByText('Gulir E2E 12').waitFor();
+      await backTo(yAtClick);
+      await page.goForward();
+      await page.getByRole('heading', { name: 'Gulir E2E 12' }).waitFor();
+      await backTo(0);
+      await page.goBack();
+      await backTo(yAtClick);
+
+      // Switching tabs from a scrolled list opens the other tab at the top.
+      await nav.getByRole('link', { name: 'Kalender', exact: true }).click();
+      await page.getByRole('heading', { name: 'Kalender', exact: true }).waitFor();
+      assert.equal(await page.evaluate(() => window.scrollY), 0, 'tab baru harus dibuka dari atas');
+
+      // Search parameters only (next month): same screen element, no replayed transition.
+      await screen.evaluate((el) => {
+        el.dataset.e2eMark = 'sama';
+      });
+      await page.getByRole('button', { name: 'Bulan berikutnya' }).click();
+      await page.waitForFunction(() => new URLSearchParams(location.search).has('bulan'));
+      assert.equal(await page.locator('[data-e2e-mark="sama"]').count(), 1, 'ganti bulan memasang ulang layar');
+
+      // Reduced motion: opacity only.
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await nav.getByRole('link', { name: 'Beranda', exact: true }).click();
+      await page.getByRole('heading', { name: 'Beranda' }).waitFor();
+      assert.equal((await screenStyle()).name, 'fade-in');
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await page.setViewportSize({ width: 412, height: 800 });
+    });
+
     await step('Ganti kata sandi: sandi saat ini salah ditolak; sesudah berhasil, perangkat ini tetap masuk', async () => {
       await page.goto(`${BASE}/pengaturan`);
       await page.getByRole('link', { name: /Kata sandi/ }).click();
@@ -473,30 +567,129 @@ async function main() {
       email = newEmail;
     });
 
-    await step('Pengaturan menampilkan email; Keluar menghapus sesi dan kembali ke /masuk', async () => {
-      await page.goto(`${BASE}/pengaturan`);
+    // ---- Sign out and sign in again: never back to a screen from before Keluar (the old step reloaded "/" and hid it) ----
+    const privateShown = (text) => text.includes('Gulir E2E') || text.includes('Navigasi utama');
+
+    await step('Keluar dari Pengaturan: sesi hilang, /masuk tanpa tujuan lama; Back sesudahnya tidak memperlihatkan layar pribadi, sekejap pun', async () => {
+      await page.goto(BASE + '/');
+      await page.getByRole('heading', { name: 'Beranda' }).waitFor();
+      await page.getByRole('link', { name: 'Pengaturan' }).click();
       await page.getByText(email).waitFor();
       await page.getByRole('button', { name: 'Keluar', exact: true }).click();
       await page.getByRole('heading', { name: 'Masuk' }).waitFor();
       assert.deepEqual(await sessionKeys(), []);
-      await page.goto(BASE + '/');
+      assert.equal(await routeState(), null, 'tujuan lama tersimpan di riwayat');
+
+      // Same document: watch for private content while Back lands on Beranda's old entry.
+      await page.evaluate(() => {
+        window.__privateSeen = false;
+        new MutationObserver(() => {
+          const text = document.body.textContent ?? '';
+          if (text.includes('Gulir E2E') || document.querySelector('nav[aria-label="Navigasi utama"]')) window.__privateSeen = true;
+        }).observe(document.body, { subtree: true, childList: true, characterData: true });
+      });
+      await page.goBack();
       await page.getByRole('heading', { name: 'Masuk' }).waitFor();
-      assert.ok(!(await page.locator('body').innerText()).includes('Utang Telat E2E'));
+      assert.equal(new URL(page.url()).pathname, '/masuk');
+      assert.equal(await routeState(), null, 'Back sesudah Keluar membawa tujuan lama');
+      assert.equal(await page.evaluate(() => window.__privateSeen), false, 'layar pribadi sempat tampil');
+      assert.ok(!privateShown(await page.locator('body').innerText()));
     });
 
-    await step('Sandi lama ditolak, sandi baru diterima; Keluar dari semua perangkat: konfirmasi dulu, lalu sesi hilang', async () => {
+    await step('Sandi lama ditolak; masuk lagi dengan sandi baru mendarat di Beranda, bukan Pengaturan atau rute lama', async () => {
       await rejectedOnPurpose(async () => {
         await login(PASSWORD);
         await page.getByText('Email atau kata sandi salah.').waitFor();
       });
       await login(NEW_PASSWORD);
-      await page.getByRole('heading', { name: 'Beranda' }).waitFor(); // the debt is settled by now, so it is not listed
-      await page.goto(`${BASE}/pengaturan`);
+      await page.waitForFunction(() => location.pathname !== '/masuk');
+      assert.equal(new URL(page.url()).pathname, '/');
+      await page.getByRole('heading', { name: 'Beranda' }).waitFor();
+    });
+
+    await step('Muat ulang layar terlindungi mempertahankan sesi; pemulihan lambat (sumber data ditahan 1,5 s) tidak memperlihatkan formulir Masuk; /masuk saat sudah masuk langsung ke Beranda tanpa kilasan formulir', async () => {
+      await page.getByRole('link', { name: 'Kalender', exact: true }).click();
+      await page.getByRole('heading', { name: 'Kalender', exact: true }).waitFor();
+      // Every document from now on records whether the sign-in form was ever in the DOM.
+      await page.addInitScript(() => {
+        window.__sawLoginForm = false;
+        new MutationObserver(() => {
+          if (document.querySelector('form[aria-label="Masuk"]')) window.__sawLoginForm = true;
+        }).observe(document, { subtree: true, childList: true });
+      });
+      await page.route('**/rest/v1/books**', async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await route.continue();
+      });
+      await page.reload();
+      await page.getByRole('status').first().waitFor();
+      await page.getByRole('heading', { name: 'Kalender', exact: true }).waitFor({ timeout: 10_000 });
+      // Waits for a request still held by the handler, so it is not continued after the route is gone.
+      await page.unrouteAll({ behavior: 'wait' });
+      assert.equal(new URL(page.url()).pathname, '/kalender');
+      assert.equal(await page.evaluate(() => window.__sawLoginForm), false, 'formulir Masuk sempat tampil saat sesi dipulihkan');
+
+      await page.goto(`${BASE}/masuk`);
+      await page.waitForFunction(() => location.pathname === '/');
+      await page.getByRole('heading', { name: 'Beranda' }).waitFor();
+      assert.equal(await page.evaluate(() => window.__sawLoginForm), false, 'formulir Masuk sempat tampil padahal sudah masuk');
+    });
+
+    await step('Keluar dari semua perangkat saat server tak terjangkau: pesan jelas, tetap di Pengaturan, sesi tetap ada (tidak gagal diam-diam)', async () => {
+      await page.getByRole('link', { name: 'Pengaturan' }).click();
       await page.getByRole('button', { name: 'Keluar dari semua perangkat' }).click();
       await page.getByText('Semua perangkat yang masuk dengan akun ini akan keluar').waitFor();
+      await page.route('**/auth/v1/logout**', (route) => route.abort());
+      await expectConsole(/ERR_FAILED|Failed to load resource/, async () => {
+        await page.getByRole('button', { name: 'Keluar dari semua perangkat' }).click();
+        await page.getByText('Tidak tersambung ke server. Periksa koneksi, lalu coba lagi.').waitFor();
+      });
+      await page.unroute('**/auth/v1/logout**');
+      assert.equal(new URL(page.url()).pathname, '/pengaturan');
+      assert.equal((await sessionKeys()).length, 1, 'sesi perangkat ini harus tetap ada');
+    });
+
+    await step('Keluar dari semua perangkat (ulang, server terjangkau): sesi hilang; Back dan akses langsung ke layar terlindungi berakhir di /masuk tanpa tujuan lama dan tanpa data pribadi', async () => {
       await page.getByRole('button', { name: 'Keluar dari semua perangkat' }).click();
       await page.getByRole('heading', { name: 'Masuk' }).waitFor();
       assert.deepEqual(await sessionKeys(), []);
+      // The global sign out reloads the page: Back opens an entry of the previous document.
+      await page.goBack();
+      await page.getByRole('heading', { name: 'Masuk' }).waitFor();
+      assert.equal(new URL(page.url()).pathname, '/masuk');
+      assert.equal(await routeState(), null, 'Back sesudah Keluar dari semua perangkat membawa tujuan lama');
+      assert.ok(!privateShown(await page.locator('body').innerText()));
+      await page.goto(`${BASE}/kalender`);
+      await page.getByRole('heading', { name: 'Masuk' }).waitFor();
+      assert.ok(!privateShown(await page.locator('body').innerText()));
+    });
+
+    await step('Desktop 1280px, tab baru tanpa sesi: tautan langsung /kalender kembali ke /kalender setelah masuk; Keluar dari Pengaturan lalu masuk lagi mendarat di Beranda', async () => {
+      const desktop = await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: 'id-ID' });
+      const tab = await desktop.newPage();
+      const tabErrors = [];
+      tab.on('pageerror', (e) => tabErrors.push(String(e)));
+      const signIn = async () => {
+        await tab.getByLabel('Email').fill(email);
+        await tab.getByLabel('Kata sandi', { exact: true }).fill(NEW_PASSWORD);
+        await tab.getByRole('button', { name: 'Masuk', exact: true }).click();
+      };
+      await tab.goto(`${BASE}/kalender`);
+      await tab.getByRole('heading', { name: 'Masuk' }).waitFor();
+      assert.deepEqual(await routeState(tab), { from: '/kalender' }, 'tautan langsung yang sah tetap diingat');
+      await signIn();
+      await tab.getByRole('heading', { name: 'Kalender', exact: true }).waitFor();
+      assert.equal(new URL(tab.url()).pathname, '/kalender');
+
+      await tab.getByRole('link', { name: 'Pengaturan' }).click();
+      await tab.getByRole('button', { name: 'Keluar', exact: true }).click();
+      await tab.getByRole('heading', { name: 'Masuk' }).waitFor();
+      await signIn();
+      await tab.waitForFunction(() => location.pathname !== '/masuk');
+      assert.equal(new URL(tab.url()).pathname, '/');
+      await tab.getByRole('heading', { name: 'Beranda' }).waitFor();
+      assert.deepEqual(tabErrors, []);
+      await desktop.close();
     });
 
     assert.deepEqual(consoleErrors, [], `galat konsol tak terduga: ${consoleErrors.join(' | ')}`);

@@ -72,6 +72,22 @@
   --text-label--line-height: 16px;
   --text-label--letter-spacing: 0.02em;
 
+  /* Gerak (DESIGN.md motion). Layar baru memudar masuk sekali; fill `backwards`: tidak ada transform tersisa setelah
+     selesai (transform pada induk menjadikannya acuan bagi elemen fixed di dalamnya). */
+  --animate-page-in: page-in 180ms cubic-bezier(0.2, 0, 0, 1) backwards;
+  --animate-fade-in: fade-in 180ms cubic-bezier(0.2, 0, 0, 1) backwards;
+  @keyframes page-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+
   --radius-*: initial;
   --radius-chip: 9999px;
   --radius-input: 12px;
