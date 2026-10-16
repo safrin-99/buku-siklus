@@ -150,9 +150,16 @@ async function main() {
       assert.deepEqual(await sessionKeys(), []);
     });
 
-    await step('masuk benar: Beranda menampilkan data buku ini, bukan data contoh', async () => {
-      await login(PASSWORD);
+    await step('masuk benar (klik ganda = satu permintaan): Beranda menampilkan data buku ini, bukan data contoh', async () => {
+      const tokenRequests = [];
+      const onRequest = (r) => r.method() === 'POST' && r.url().includes('/auth/v1/token') && tokenRequests.push(r.url());
+      page.on('request', onRequest);
+      await page.getByLabel('Email').fill(email);
+      await page.getByLabel('Kata sandi', { exact: true }).fill(PASSWORD);
+      await page.getByRole('button', { name: 'Masuk', exact: true }).dblclick();
       await page.getByRole('heading', { name: 'Beranda' }).waitFor();
+      page.off('request', onRequest);
+      assert.equal(tokenRequests.length, 1, `permintaan masuk terkirim ${tokenRequests.length} kali`);
       await page.getByText('Utang Telat E2E').waitFor();
       const body = await page.locator('body').innerText();
       assert.ok(!body.includes('dr. Hendra'), 'data contoh tidak boleh tampil');

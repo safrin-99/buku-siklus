@@ -72,14 +72,20 @@ const INTERACTIONS = [
       await password.press('Enter'); // keyboard submit
       await page.getByText('Format email belum benar. Contoh: nama@gmail.com.').waitFor();
       yield 'format-email';
-      await page.getByRole('button', { name: 'Tampilkan kata sandi' }).click();
+      const eye = page.getByRole('button', { name: 'Tampilkan kata sandi' });
+      await eye.click();
       assert.equal(await password.getAttribute('type'), 'text', 'tombol mata menampilkan sandi');
-      await page.getByRole('button', { name: 'Sembunyikan kata sandi' }).click();
+      assert.equal(await eye.getAttribute('aria-pressed'), 'true', 'status tombol mata diumumkan lewat aria-pressed');
+      await eye.click();
       assert.equal(await password.getAttribute('type'), 'password', 'tombol mata menyembunyikan lagi');
+      assert.equal(await eye.getAttribute('aria-pressed'), 'false');
       await email.fill('pemilik@contoh.id');
       await password.press('Enter');
       await page.getByText('Memproses…').waitFor();
-      assert.equal(await page.getByRole('button', { name: 'Memproses…' }).isDisabled(), true, 'tombol terkunci saat memproses');
+      const busy = page.getByRole('button', { name: 'Memproses…' });
+      assert.equal(await busy.getAttribute('aria-disabled'), 'true', 'tombol terkunci saat memproses');
+      assert.equal(await busy.getAttribute('aria-busy'), 'true');
+      assert.equal(await email.getAttribute('readonly'), '', 'kolom terkunci saat memproses');
       yield 'memproses';
       await page.getByText('Mode contoh: tindakan ini tidak tersedia.').waitFor();
       yield 'galat';
