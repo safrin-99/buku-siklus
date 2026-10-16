@@ -1,11 +1,13 @@
 // Uji skema Supabase memakai PGlite (Postgres in-process). Jalankan: node --test db.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 
 const root = new URL('../supabase/', import.meta.url);
-const migration = readFileSync(new URL('migrations/20261015000001_init.sql', root), 'utf8');
+// Every migration, in file-name order, exactly as `supabase db push` applies them.
+const migrations = readdirSync(new URL('migrations/', root)).filter((f) => f.endsWith('.sql')).sort()
+  .map((f) => readFileSync(new URL(`migrations/${f}`, root), 'utf8'));
 const seed = readFileSync(new URL('seed.sql', root), 'utf8');
 
 const A = '00000000-0000-4000-8000-0000000000a1';   // pengguna seed
@@ -28,7 +30,7 @@ const prelude = `
 async function fresh({ withSeed = true } = {}) {
   const db = new PGlite();
   await db.exec(prelude);
-  await db.exec(migration);
+  for (const m of migrations) await db.exec(m);
   if (withSeed) await db.exec(seed);
   await db.exec(`insert into auth.users (id, email) values ('${B}', 'b@test.local') on conflict do nothing;`);
   return db;
@@ -274,6 +276,127 @@ test('RLS: Kotak Masuk hanya bisa ditulis service_role; anggota hanya bisa menye
   // idempotensi: kunci yang sama untuk buku yang sama tidak bisa dimasukkan dua kali
   await rejects(db.exec(`insert into inbox_events (book_id, source, received_at, masked_text, idempotency_key)
     values ('${BOOK}', 'BCA Mobile', now(), 'dup', 'seed-bca-0847')`), /duplicate|unique/i);
+});
+
+const NEW = 'aaaaaaaa-0000-4000-8000-000000000001';
+const sched = (...rows) => JSON.stringify(rows.map(([due_date, amount_idr]) => ({ due_date, amount_idr })));
+const createDebt = (db, id, { book = BOOK, direction = 'owe', name = 'Motor', total = 3000000, installments, description = null, category = null, memo = null } = {}) =>
+  db.query(`select create_debt($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9) as id`,
+    [id, book, direction, name, total, installments ?? sched(['2026-11-25', 1000000], ['2026-12-25', 1000000], ['2027-01-25', 1000000]), description, category, memo]);
+
+test('create_debt: catatan + cicilan dalam satu transaksi, urut tanggal, teks dirapikan, integritas kosong', async () => {
+  const db = await fresh();
+  await as(db, A, async () => {
+    // Cicilan dikirim tidak berurutan: urutan seq mengikuti tanggal jatuh tempo.
+    const installments = sched(['2026-12-25', 1000000], ['2026-11-25', 1000000], ['2027-01-25', 1000000]);
+    const [r] = await q(db, `select create_debt($1, $2, 'owe', '  Motor  ', 3000000, $3::jsonb, ' Kredit ', '', null) as id`, [NEW, BOOK, installments]);
+    assert.equal(r.id, NEW);
+    const [d] = await q(db, 'select name, description, category, memo, created_by from debts where id = $1', [NEW]);
+    assert.deepEqual(d, { name: 'Motor', description: 'Kredit', category: null, memo: null, created_by: A });
+    const inst = await q(db, 'select seq, due_date::text due, amount_idr from installments where debt_id = $1 order by seq', [NEW]);
+    assert.deepEqual(inst, [
+      { seq: 1, due: '2026-11-25', amount_idr: 1000000 },
+      { seq: 2, due: '2026-12-25', amount_idr: 1000000 },
+      { seq: 3, due: '2027-01-25', amount_idr: 1000000 },
+    ]);
+    assert.equal((await q(db, 'select * from debt_integrity_issues')).length, 0);
+    const [row] = await q(db, `select status, next_due_date::text nd, installment_count from debt_list($1, '2026-10-15') where debt_id = $2`, [BOOK, NEW]);
+    assert.deepEqual(row, { status: 'active', nd: '2026-11-25', installment_count: 3 });
+  });
+});
+
+test('create_debt: kirim ulang dengan id yang sama tidak membuat catatan ganda', async () => {
+  const db = await fresh();
+  await as(db, A, async () => {
+    await createDebt(db, NEW);
+    const [again] = await q(db, `select create_debt($1, $2, 'owe', 'Motor', 3000000, $3::jsonb) as id`,
+      [NEW, BOOK, sched(['2026-11-25', 1000000], ['2026-12-25', 1000000], ['2027-01-25', 1000000])]);
+    assert.equal(again.id, NEW);
+    assert.equal((await q(db, 'select * from debts where id = $1', [NEW])).length, 1);
+    assert.equal((await q(db, 'select * from installments where debt_id = $1', [NEW])).length, 3);
+  });
+});
+
+test('create_debt: masukan tidak valid ditolak server dan tidak ada yang tersimpan', async () => {
+  const db = await fresh();
+  await as(db, A, async () => {
+    const bad = [
+      ['jumlah cicilan != total', { installments: sched(['2026-11-25', 1000000], ['2026-12-25', 1000000]) }],
+      ['total 0', { total: 0, installments: sched(['2026-11-25', 0]) }],
+      ['nominal cicilan negatif', { total: 1000, installments: sched(['2026-11-25', 2000], ['2026-12-25', -1000]) }],
+      ['nama kosong', { name: '   ' }],
+      ['nama > 80 karakter', { name: 'x'.repeat(81) }],
+      ['jadwal kosong', { installments: '[]' }],
+      ['bukan daftar', { installments: '{"due_date":"2026-11-25","amount_idr":3000000}' }],
+      ['tanggal tidak ada di kalender', { total: 1000, installments: sched(['2026-02-30', 1000]) }],
+      ['tanggal di luar rentang', { total: 1000, installments: sched(['1999-12-31', 1000]) }],
+      ['nominal pecahan', { total: 1000, installments: JSON.stringify([{ due_date: '2026-11-25', amount_idr: 999.5 }]) }],
+      ['tanggal hilang', { total: 1000, installments: JSON.stringify([{ amount_idr: 1000 }]) }],
+      ['memo > 2000 karakter', { memo: 'm'.repeat(2001) }],
+    ];
+    for (const [label, opts] of bad) {
+      await assert.rejects(createDebt(db, NEW, opts), undefined, label);
+    }
+    assert.equal((await q(db, 'select * from debts where id = $1', [NEW])).length, 0);
+    assert.equal((await q(db, 'select * from installments where debt_id = $1', [NEW])).length, 0);
+  });
+});
+
+test('create_debt: orang asing dan viewer ditolak RLS; editor boleh; anon tidak bisa memanggil', async () => {
+  const db = await fresh();
+  await as(db, B, () => rejects(createDebt(db, NEW), /row-level security/i));
+  await as(db, A, () => db.query(`insert into book_members (book_id, user_id, role) values ($1, $2, 'viewer')`, [BOOK, B]));
+  await as(db, B, () => rejects(createDebt(db, NEW), /row-level security/i));
+  await as(db, '', () => rejects(createDebt(db, NEW), /permission denied/i), 'anon');
+  await as(db, A, () => db.query(`update book_members set role = 'editor' where book_id = $1 and user_id = $2`, [BOOK, B]));
+  await as(db, B, async () => {
+    await createDebt(db, NEW);
+    const [d] = await q(db, 'select created_by from debts where id = $1', [NEW]);
+    assert.equal(d.created_by, B);
+  });
+});
+
+test('debts: hanya kolom teks yang bisa diubah lewat API; total, jenis, dan buku ditolak', async () => {
+  const db = await fresh();
+  await as(db, A, async () => {
+    await db.query(`update debts set name = 'dr. Hendra S.', memo = 'Memo baru', category = 'Kesehatan', description = null where id = $1`, [HENDRA]);
+    const [d] = await q(db, 'select name, memo, category, description from debts where id = $1', [HENDRA]);
+    assert.deepEqual(d, { name: 'dr. Hendra S.', memo: 'Memo baru', category: 'Kesehatan', description: null });
+    await rejects(db.query(`update debts set total_idr = 1 where id = $1`, [HENDRA]), /permission denied/i);
+    await rejects(db.query(`update debts set direction = 'owed' where id = $1`, [HENDRA]), /permission denied/i);
+    await rejects(db.query(`update debts set book_id = book_id where id = $1`, [HENDRA]), /permission denied/i);
+    await rejects(db.query(`update debts set memo = $2 where id = $1`, [HENDRA, 'm'.repeat(2001)]), /debts_memo_len/);
+    await rejects(db.query(`update debts set name = '  ' where id = $1`, [HENDRA]), /check constraint/i);
+  });
+  // Orang asing: RLS menyaring barisnya, tidak ada yang berubah.
+  await as(db, B, () => db.query(`update debts set memo = 'disusupi' where id = $1`, [HENDRA]));
+  await as(db, A, async () => {
+    const [d] = await q(db, 'select memo from debts where id = $1', [HENDRA]);
+    assert.equal(d.memo, 'Memo baru');
+  });
+});
+
+test('debts: hapus catatan tanpa pembayaran ikut menghapus cicilannya; catatan berpembayaran tidak bisa dihapus', async () => {
+  const db = await fresh();
+  await as(db, A, async () => {
+    // Budi Santo: piutang tanpa pembayaran.
+    await db.query('delete from debts where id = $1', [BUDI]);
+    assert.equal((await q(db, 'select * from debts where id = $1', [BUDI])).length, 0);
+    assert.equal((await q(db, 'select * from installments where debt_id = $1', [BUDI])).length, 0);
+    // dr. Hendra punya riwayat pembayaran: ledger tidak pernah dihapus, jadi catatannya juga tidak.
+    await rejects(db.query('delete from debts where id = $1', [HENDRA]), /foreign key/i);
+    assert.equal((await q(db, 'select * from payments where debt_id = $1', [HENDRA])).length, 2);
+  });
+  await as(db, B, () => db.query('delete from debts where id = $1', [REZA]));
+  await as(db, A, async () => assert.equal((await q(db, 'select * from debts where id = $1', [REZA])).length, 1));
+});
+
+test('cycle_summary: tunggakan siklus lalu masuk carryover dan TIDAK mengurangi sisa kas (aturan DESIGN.md: gaji − kewajiban siklus ini)', async () => {
+  const db = await fresh();
+  // 5 Nov 2026, gajian tanggal 1: siklus 1–30 Nov. Belum dibayar dari Oktober: Hendra ke-3 (11 Okt) 600.000,
+  // Laptop ke-4 (25 Okt) 600.000, Koperasi ke-2 (28 Okt) 800.000. Jatuh tempo November: Laptop ke-5 600.000 + Koperasi ke-3 800.000.
+  const [c] = await q(db, `select obligations_idr, carryover_overdue_idr, free_idr, base_salary_idr from cycle_summary($1, '2026-11-05')`, [BOOK]);
+  assert.deepEqual(c, { obligations_idr: 1400000, carryover_overdue_idr: 2000000, free_idr: 8100000, base_salary_idr: 9500000 });
 });
 
 test('debt_list tanpa p_today memakai hari ini menurut zona waktu buku (tanpa error)', async () => {

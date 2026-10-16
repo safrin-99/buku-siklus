@@ -2,7 +2,7 @@
 // in PGlite as an RLS-bound `authenticated` user, and the rows go through the same mappers and Zod schemas the app
 // uses. PGlite parsers mimic PostgREST's JSON (dates as strings, bigint as numbers). This does NOT cover HTTP, JWT
 // or PostgREST itself; that is src/integration/data.local.test.ts.
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { PGlite, types } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -56,7 +56,10 @@ beforeAll(async () => {
     },
   });
   await db.exec(prelude);
-  await db.exec(sql('migrations/20261015000001_init.sql'));
+  // Every migration, in file-name order, as `supabase db push` applies them.
+  for (const f of readdirSync(new URL('../../supabase/migrations/', import.meta.url)).filter((n) => n.endsWith('.sql')).sort()) {
+    await db.exec(sql(`migrations/${f}`));
+  }
   await db.exec(sql('seed.sql'));
   await db.exec(`insert into auth.users (id, email) values ('${STRANGER}', 'b@test.local') on conflict do nothing;`);
 }, 60_000);
