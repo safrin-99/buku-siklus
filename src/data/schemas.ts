@@ -68,6 +68,13 @@ export const installmentRowSchema = z.object({
   due_remaining_idr: idr,
 });
 
+export const bookSettingsRowSchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  payday_day: z.number().int(),
+  base_salary_idr: idr.nullable(),
+});
+
 export const fixtureSchema = z.object({
   today: isoDate,
   book: z.object({ id: z.string(), name: z.string(), timezone: z.string() }),

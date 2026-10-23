@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import raw from '../data/fixtures.generated.json';
 import { fixtureSchema, type InstallmentRow, type PaymentRow } from '../data/schemas';
 import {
+  canReverse,
   debtCaption,
   directionSummary,
   filterDebts,
   homeLists,
   installmentProgress,
   labelPayments,
+  reversedPaymentIds,
   segmentPercents,
 } from './derive';
 
@@ -117,6 +119,59 @@ describe('labelPayments', () => {
     );
     expect(labels.get('r')?.kind).toBe('reversal');
     expect(labels.get('b')?.title).toBe('Cicilan ke-1');
+  });
+});
+
+describe('labelPayments: koreksi lalu catat ulang', () => {
+  const installments = [inst(1, 450000), inst(2, 450000), inst(3, 600000)];
+
+  it('urutan kronologis (bayar, batalkan, catat ulang) memberi label yang masuk akal', () => {
+    const labels = labelPayments(
+      [pay('a', 450000), pay('b', 450000), pay('r', -450000, { reverses_payment_id: 'b' }), pay('c', 450000)],
+      installments,
+    );
+    expect(labels.get('a')?.title).toBe('Cicilan ke-1');
+    expect(labels.get('b')?.title).toBe('Cicilan ke-2');
+    expect(labels.get('r')?.title).toBe('Pembalikan');
+    expect(labels.get('c')?.title).toBe('Cicilan ke-2');
+  });
+
+  it('label mengikuti urutan array: pemanggil harus mengurutkan (paid_on, created_at)', () => {
+    // Pembayaran bertanggal mundur yang jatuh SEBELUM pembalik di urutan array dilabeli seolah masih di atas total
+    // sebelum pembalik. Saldo tetap benar (dihitung SQL); hanya label riwayat yang bisa menyesatkan.
+    // Sumber data mengurutkan paid_on lalu created_at.
+    const labels = labelPayments(
+      [pay('a', 450000), pay('b', 450000), pay('c', 450000), pay('r', -450000, { reverses_payment_id: 'b' })],
+      installments,
+    );
+    expect(labels.get('b')?.title).toBe('Cicilan ke-2');
+    expect(labels.get('c')?.title).toBe('Pembayaran sebagian');
+    expect(labels.get('r')?.title).toBe('Pembalikan');
+  });
+});
+
+describe('reversedPaymentIds / canReverse', () => {
+  const original = pay('a', 450000);
+  const reversal = pay('r', -450000, { reverses_payment_id: 'a' });
+  const other = pay('b', 450000);
+
+  it('mengumpulkan id yang sudah dibalik', () => {
+    expect([...reversedPaymentIds([original, reversal, other])]).toEqual(['a']);
+    expect(reversedPaymentIds([original, other]).size).toBe(0);
+    expect(reversedPaymentIds([]).size).toBe(0);
+  });
+
+  it('pembayaran positif yang belum dibalik boleh dibatalkan', () => {
+    const reversed = reversedPaymentIds([original, reversal, other]);
+    expect(canReverse(other, reversed)).toBe(true);
+  });
+
+  it('yang sudah dibalik tidak boleh dibalik lagi', () => {
+    expect(canReverse(original, reversedPaymentIds([original, reversal]))).toBe(false);
+  });
+
+  it('entri pembalik tidak pernah boleh dibatalkan', () => {
+    expect(canReverse(reversal, reversedPaymentIds([original, reversal]))).toBe(false);
   });
 });
 

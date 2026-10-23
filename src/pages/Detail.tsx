@@ -1,6 +1,8 @@
+import { ChevronRight } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { LedgerList } from '../components/DebtRows';
 import { ScreenHeader } from '../components/layout/ScreenHeader';
+import { buttonClass } from '../components/ui/Button';
 import { Money } from '../components/ui/Money';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { SectionTitle } from '../components/ui/SectionTitle';
@@ -9,7 +11,7 @@ import { StatusChip } from '../components/ui/StatusChip';
 import { useDebtDetail, useToday } from '../data/hooks';
 import { NotFoundError, type DebtDetail } from '../data/source';
 import { formatDate, formatDay } from '../lib/dates';
-import { installmentProgress, labelPayments } from '../lib/derive';
+import { installmentProgress, labelPayments, reversedPaymentIds } from '../lib/derive';
 import { percentOf } from '../lib/money';
 import { chipFor, progressToneFor } from '../lib/status';
 
@@ -19,6 +21,7 @@ function Content({ detail, today }: { detail: DebtDetail; today: string }) {
   const chip = chipFor(debt.status, debt.days_to_due);
   const percent = percentOf(debt.paid_idr, debt.total_idr);
   const labels = labelPayments(payments, installments);
+  const reversedIds = reversedPaymentIds(payments);
   const progress = installmentProgress(installments);
   const next = installments.find((i) => !i.is_paid);
   const isLast = next !== undefined && next.seq === installments.length;
@@ -66,25 +69,33 @@ function Content({ detail, today }: { detail: DebtDetail; today: string }) {
             {payments.map((p) => {
               const label = labels.get(p.id);
               const reversal = p.amount_idr < 0;
+              const cancelled = reversedIds.has(p.id);
+              const neutral = reversal || cancelled;
               return (
-                <li key={p.id} className="flex items-start justify-between gap-3 px-4 py-3.5">
-                  <div className="min-w-0">
-                    <p className="text-body font-semibold">
-                      {label?.title ?? 'Pembayaran'} {'·'} {formatDay(p.paid_on, today)}
-                    </p>
-                    {p.reference || p.note ? (
-                      <p className="text-caption text-ink-2">{p.reference ? `Ref: ${p.reference}` : p.note}</p>
-                    ) : null}
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end">
-                    <span className={reversal ? 'text-ink' : 'text-status-paid-text'}>
-                      <span className="tabular-nums text-money-md font-semibold">{reversal ? '' : '+'}</span>
-                      <Money value={p.amount_idr} />
-                    </span>
-                    <span className={`text-caption font-semibold ${reversal ? 'text-ink-2' : 'text-status-paid-text'}`}>
-                      {reversal ? 'Dikoreksi' : owe ? 'Dibayar' : 'Diterima'}
-                    </span>
-                  </div>
+                <li key={p.id}>
+                  <Link
+                    to={`/catatan/${debt.debt_id}/pembayaran/${p.id}`}
+                    className="flex min-h-16 items-center gap-3 px-4 py-3.5 active:bg-surface-inset focus-visible:outline-offset-[-2px]"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-body font-semibold">
+                        {label?.title ?? 'Pembayaran'} {'·'} {formatDay(p.paid_on, today)}
+                      </p>
+                      {p.reference || p.note ? (
+                        <p className="text-caption text-ink-2">{p.reference ? `Ref: ${p.reference}` : p.note}</p>
+                      ) : null}
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end">
+                      <span className={neutral ? 'text-ink' : 'text-status-paid-text'}>
+                        <span className="tabular-nums text-money-md font-semibold">{neutral ? '' : '+'}</span>
+                        <Money value={p.amount_idr} />
+                      </span>
+                      <span className={`text-caption font-semibold ${neutral ? 'text-ink-2' : 'text-status-paid-text'}`}>
+                        {reversal ? 'Dikoreksi' : cancelled ? 'Dibatalkan' : owe ? 'Dibayar' : 'Diterima'}
+                      </span>
+                    </div>
+                    <ChevronRight aria-hidden size={20} className="shrink-0 text-muted" />
+                  </Link>
                 </li>
               );
             })}
@@ -113,6 +124,17 @@ function Content({ detail, today }: { detail: DebtDetail; today: string }) {
           {memo ? <p className="text-body">{memo}</p> : <p className="text-body text-ink-2">Belum ada catatan.</p>}
         </div>
       </section>
+
+      <div className="flex flex-col gap-3">
+        {debt.remaining_idr > 0 ? (
+          <Link to={`/catatan/${debt.debt_id}/bayar`} className={buttonClass('primary')}>
+            Catat pembayaran
+          </Link>
+        ) : null}
+        <Link to={`/catatan/${debt.debt_id}/ubah`} className={buttonClass('secondary')}>
+          Ubah catatan
+        </Link>
+      </div>
     </>
   );
 }

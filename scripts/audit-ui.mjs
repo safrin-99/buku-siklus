@@ -1,13 +1,20 @@
-// Audit render: membuka build produksi (vite preview) di Chromium pada 360px dan 412px,
+// Audit render: membuka build mode fixture (vite preview, dist-fixture/) di Chromium pada 360px dan 412px,
 // memeriksa aturan DESIGN.md yang bisa diukur mesin, dan menyimpan tangkapan layar ke audit-out/.
-// Pakai: pnpm build && pnpm audit:ui   (CHROMIUM_PATH opsional)
+// Pakai: pnpm audit:ui   (membangun sendiri dalam mode fixture; CHROMIUM_PATH opsional)
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import assert from 'node:assert/strict';
+import { mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { chromium } from 'playwright-core';
+import { findChromium, waitForServer } from './lib/browser.mjs';
 
 const PORT = 4173;
 const BASE = `http://127.0.0.1:${PORT}`;
 const HENDRA = '20000000-0000-4000-8000-000000000001';
+const BUDI = '20000000-0000-4000-8000-000000000006';
+const ARISAN = '20000000-0000-4000-8000-000000000004';
+// Fixture payment ids are synthetic (pay-N); pick Hendra's first real payment for the payment detail screen.
+const fixture = JSON.parse(readFileSync(new URL('../src/data/fixtures.generated.json', import.meta.url), 'utf8'));
+const HENDRA_PAYMENT = fixture.payments.find((p) => p.debt_id === HENDRA && p.amount_idr > 0).id;
 const WIDTHS = [360, 412];
 const OUT = 'audit-out';
 
@@ -25,33 +32,254 @@ const ROUTES = [
   '/catatan?fixture=error',
   `/catatan/${HENDRA}?fixture=error`,
   '/catatan/tidak-ada',
+  '/masuk?fixture=signedout',
+  '/pengaturan',
+  '/pengaturan?fixture=loading',
+  '/pengaturan?fixture=error',
+  '/pengaturan/gajian',
+  '/pengaturan/gajian?fixture=loading',
+  '/pengaturan/gajian?fixture=error',
+  '/pengaturan/kata-sandi',
+  '/tambah',
+  '/tambah?jenis=piutang',
+  `/catatan/${HENDRA}/ubah`,
+  `/catatan/${BUDI}/ubah`,
+  '/catatan/tidak-ada/ubah',
+  `/catatan/${HENDRA}/ubah?fixture=error`,
+  '/kalender',
+  '/kalender?bulan=2026-11',
+  '/kalender?bulan=2026-10&tanggal=2026-10-11',
+  '/kalender?fixture=empty',
+  '/kalender?fixture=loading',
+  '/kalender?fixture=error',
+  '/kotak-masuk',
+  '/kotak-masuk?fixture=empty',
+  '/pengaturan?fixture=emailpending',
+  '/pengaturan/email',
+  '/pengaturan/email?fixture=emailpending',
+  '/pengaturan/email?konfirmasi=sebagian&fixture=emailpending',
+  '/pengaturan/email?konfirmasi=selesai',
+  '/pengaturan/email?konfirmasi=gagal',
+  `/catatan/${HENDRA}/bayar`,
+  `/catatan/${HENDRA}/bayar?fixture=error`,
+  `/catatan/${ARISAN}/bayar`,
+  '/catatan/tidak-ada/bayar',
+  `/catatan/${HENDRA}/pembayaran/${HENDRA_PAYMENT}`,
+  `/catatan/${HENDRA}/pembayaran/tidak-ada`,
 ];
 
-function findChromium() {
-  if (process.env.CHROMIUM_PATH) return process.env.CHROMIUM_PATH;
-  const root = process.env.PLAYWRIGHT_BROWSERS_PATH ?? '/opt/pw-browsers';
-  if (existsSync(root)) {
-    for (const dir of readdirSync(root).filter((d) => d.startsWith('chromium-')).sort().reverse()) {
-      const p = `${root}/${dir}/chrome-linux/chrome`;
-      if (existsSync(p)) return p;
-    }
-    if (existsSync(`${root}/chromium/chrome`)) return `${root}/chromium/chrome`;
-  }
-  return undefined; // biarkan playwright mencari sendiri
-}
-
-async function waitForServer(url, ms = 15000) {
-  const t0 = Date.now();
-  while (Date.now() - t0 < ms) {
-    try {
-      if ((await fetch(url)).ok) return;
-    } catch {
-      /* belum siap */
-    }
-    await new Promise((r) => setTimeout(r, 200));
-  }
-  throw new Error('vite preview tidak siap');
-}
+// Keadaan yang hanya muncul setelah interaksi. Tiap langkah mengembalikan nama keadaan untuk diperiksa.
+const INTERACTIONS = [
+  {
+    route: '/masuk?fixture=signedout',
+    name: 'masuk',
+    run: async function* (page) {
+      const email = page.getByLabel('Email');
+      const password = page.getByLabel('Kata sandi', { exact: true });
+      await page.getByRole('button', { name: 'Masuk', exact: true }).click();
+      await page.getByText('Isi email.').waitFor();
+      await page.getByText('Isi kata sandi.').waitFor();
+      assert.equal(await email.evaluate((el) => el === document.activeElement), true, 'fokus pindah ke kolom pertama yang salah');
+      yield 'validasi-kosong';
+      await email.fill('pemilik');
+      assert.equal(await page.getByText('Isi email.').count(), 0, 'mengetik menghapus pesan kolom itu');
+      await password.fill('rahasia-contoh');
+      await password.press('Enter'); // keyboard submit
+      await page.getByText('Format email belum benar. Contoh: nama@gmail.com.').waitFor();
+      yield 'format-email';
+      const eye = page.getByRole('button', { name: 'Tampilkan kata sandi' });
+      await eye.click();
+      assert.equal(await password.getAttribute('type'), 'text', 'tombol mata menampilkan sandi');
+      assert.equal(await eye.getAttribute('aria-pressed'), 'true', 'status tombol mata diumumkan lewat aria-pressed');
+      await eye.click();
+      assert.equal(await password.getAttribute('type'), 'password', 'tombol mata menyembunyikan lagi');
+      assert.equal(await eye.getAttribute('aria-pressed'), 'false');
+      await email.fill('pemilik@contoh.id');
+      await password.press('Enter');
+      await page.getByText('Memproses…').waitFor();
+      const busy = page.getByRole('button', { name: 'Memproses…' });
+      assert.equal(await busy.getAttribute('aria-disabled'), 'true', 'tombol terkunci saat memproses');
+      assert.equal(await busy.getAttribute('aria-busy'), 'true');
+      assert.equal(await email.getAttribute('readonly'), '', 'kolom terkunci saat memproses');
+      yield 'memproses';
+      await page.getByText('Mode contoh: tindakan ini tidak tersedia.').waitFor();
+      yield 'galat';
+    },
+  },
+  {
+    route: `/catatan/${HENDRA}/bayar`,
+    name: 'bayar',
+    run: async function* (page) {
+      const amount = page.getByLabel('Nominal dibayar');
+      assert.equal(await amount.inputValue(), '600.000', 'nominal terisi sebesar tagihan berikutnya');
+      await amount.fill('1234567');
+      assert.equal(await amount.inputValue(), '1.234.567', 'pemisah ribuan otomatis saat mengetik');
+      await amount.fill('');
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      yield 'validasi-kosong';
+      await amount.fill('999999');
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByText('Nominal melebihi sisa (Rp600.000).').waitFor();
+      yield 'melebihi-sisa';
+      await page.getByLabel('Tanggal bayar').fill('2026-10-16');
+      await amount.fill('300000');
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByText('Tanggal tidak boleh setelah hari ini.').waitFor();
+      yield 'tanggal-masa-depan';
+      await page.getByLabel('Tanggal bayar').fill('2026-10-15');
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByText('Menyimpan…').waitFor();
+      yield 'menyimpan';
+      await page.getByText('Mode contoh: perubahan tidak disimpan.').waitFor();
+      yield 'galat';
+    },
+  },
+  {
+    route: `/catatan/${HENDRA}/pembayaran/${HENDRA_PAYMENT}`,
+    name: 'pembayaran',
+    run: async function* (page) {
+      await page.getByRole('button', { name: 'Batalkan pembayaran' }).click();
+      await page.getByText('Pembayaran asli tetap tampil di riwayat.').waitFor();
+      yield 'konfirmasi';
+      await page.getByRole('button', { name: 'Ya, batalkan pembayaran' }).click();
+      await page.getByText('Memproses…').waitFor();
+      yield 'memproses';
+      await page.getByText('Mode contoh: perubahan tidak disimpan.').waitFor();
+      yield 'galat';
+    },
+  },
+  {
+    route: '/pengaturan',
+    name: 'pengaturan',
+    run: async function* (page) {
+      await page.getByRole('button', { name: 'Keluar dari semua perangkat' }).click();
+      yield 'konfirmasi-keluar-semua';
+      await page.getByRole('button', { name: 'Keluar dari semua perangkat' }).click();
+      await page.getByText('Mode contoh: tindakan ini tidak tersedia.').waitFor();
+      yield 'galat';
+    },
+  },
+  {
+    route: '/pengaturan/gajian',
+    name: 'gajian',
+    run: async function* (page) {
+      const payday = page.getByLabel('Tanggal gajian');
+      const salary = page.getByLabel('Gaji pokok bulanan (opsional)');
+      assert.equal(await payday.inputValue(), '1', 'tanggal gajian terisi dari buku');
+      assert.equal(await salary.inputValue(), '9.500.000', 'gaji pokok terisi dari buku');
+      await salary.fill('0');
+      assert.equal(await salary.inputValue(), '', 'Rp0 tidak bisa diketik: kolom kosong berarti tidak dipakai');
+      await payday.fill('29');
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByText('Isi tanggal antara 1 dan 28.').waitFor();
+      yield 'validasi';
+      await payday.fill('25');
+      await salary.fill('');
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByText('Menyimpan…').waitFor();
+      yield 'menyimpan';
+      await page.getByText('Mode contoh: perubahan tidak disimpan.').waitFor();
+      yield 'galat';
+    },
+  },
+  {
+    route: '/pengaturan/kata-sandi',
+    name: 'kata-sandi',
+    run: async function* (page) {
+      const submit = page.getByRole('button', { name: 'Ganti kata sandi' });
+      await submit.click();
+      await page.getByText('Isi kata sandi saat ini.').waitFor();
+      yield 'validasi-kosong';
+      await page.getByLabel('Kata sandi saat ini', { exact: true }).fill('sandi-lama-contoh');
+      await page.getByLabel('Kata sandi baru', { exact: true }).fill('sandi-baru-contoh');
+      await page.getByLabel('Ulangi kata sandi baru', { exact: true }).fill('sandi-baru-contoh-x');
+      await page.getByRole('button', { name: 'Tampilkan kata sandi baru' }).click();
+      await submit.click();
+      await page.getByText('Tidak sama dengan kata sandi baru. Ketik ulang dengan persis sama.').waitFor();
+      yield 'ulangan-beda';
+      await page.getByLabel('Ulangi kata sandi baru', { exact: true }).fill('sandi-baru-contoh');
+      await submit.click();
+      await page.getByText('Memproses…').waitFor();
+      yield 'memproses';
+      await page.getByText('Mode contoh: tindakan ini tidak tersedia.').waitFor();
+      yield 'galat';
+    },
+  },
+  {
+    route: '/tambah',
+    name: 'tambah',
+    run: async function* (page) {
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByText('Isi nama orang atau pihaknya.').waitFor();
+      assert.equal(await page.getByLabel('Berutang kepada').evaluate((el) => el === document.activeElement), true, 'fokus ke kolom salah pertama');
+      yield 'validasi-kosong';
+      await page.getByLabel('Berutang kepada').fill('Motor');
+      await page.getByLabel('Nominal total').fill('1000000');
+      await page.getByText('Cicilan bulanan').click();
+      await page.getByLabel('Jumlah cicilan').fill('12');
+      await page.getByLabel('Jatuh tempo cicilan pertama').fill('2026-11-25');
+      await page.getByRole('list', { name: 'Jadwal cicilan' }).getByText('Rp83.337').waitFor();
+      yield 'cicilan-pratinjau';
+      await page.getByRole('button', { name: 'Simpan' }).click();
+      await page.getByText('Menyimpan…').waitFor();
+      yield 'menyimpan';
+      await page.getByText('Mode contoh: perubahan tidak disimpan.').waitFor();
+      yield 'galat';
+    },
+  },
+  {
+    route: `/catatan/${BUDI}/ubah`,
+    name: 'ubah',
+    run: async function* (page) {
+      await page.getByLabel('Nama').fill('');
+      await page.getByRole('button', { name: 'Simpan perubahan' }).click();
+      await page.getByText('Isi nama orang atau pihaknya.').waitFor();
+      yield 'validasi';
+      await page.getByRole('button', { name: 'Hapus catatan' }).click();
+      await page.getByText('akan dihapus permanen').waitFor();
+      yield 'konfirmasi-hapus';
+      await page.getByRole('button', { name: 'Ya, hapus catatan' }).click();
+      await page.getByText('Mode contoh: perubahan tidak disimpan.').waitFor();
+      yield 'hapus-galat';
+    },
+  },
+  {
+    route: '/kalender',
+    name: 'kalender',
+    run: async function* (page) {
+      await page.getByRole('button', { name: /^Minggu, 11 Oktober 2026/ }).click();
+      await page.getByRole('region', { name: 'Agenda' }).getByText('dr. Hendra').waitFor();
+      yield 'pilih-terlambat';
+      await page.getByRole('button', { name: /^Selasa, 13 Oktober 2026/ }).click();
+      await page.getByText('Tidak ada tagihan di tanggal ini.').waitFor();
+      yield 'tanggal-kosong';
+      await page.getByRole('button', { name: 'Bulan berikutnya' }).click();
+      await page.getByRole('heading', { name: 'November 2026', exact: true }).waitFor();
+      yield 'bulan-berikutnya';
+    },
+  },
+  {
+    route: '/pengaturan/email',
+    name: 'email',
+    run: async function* (page) {
+      const submit = page.getByRole('button', { name: 'Kirim tautan konfirmasi' });
+      await submit.click();
+      await page.getByText('Isi email baru.').waitFor();
+      yield 'validasi-kosong';
+      await page.getByLabel('Email baru').fill('contoh@buku-siklus.local');
+      await page.getByLabel('Kata sandi', { exact: true }).fill('rahasia-contoh');
+      await submit.click();
+      await page.getByText('Ini email yang sedang dipakai.').waitFor();
+      yield 'email-sama';
+      await page.getByLabel('Email baru').fill('nama-yang-sangat-panjang-sekali.untuk-uji@subdomain.contoh-domain.co.id');
+      await submit.click();
+      await page.getByText('Mengirim…').waitFor();
+      yield 'mengirim';
+      await page.getByText('Mode contoh: tindakan ini tidak tersedia.').waitFor();
+      yield 'galat';
+    },
+  },
+];
 
 /** Dijalankan di dalam halaman. Mengembalikan daftar temuan. */
 function inPage() {
@@ -150,7 +378,9 @@ function inPage() {
   const interactive = document.querySelectorAll('a[href], button, input, select, textarea, [role="tab"], [role="button"]');
   for (const el of interactive) {
     if (!(el instanceof HTMLElement) || !visible(el)) continue;
-    const r = el.getBoundingClientRect();
+    // A visually hidden radio/checkbox inside a <label> is operated through that label: measure the label instead.
+    const wrapping = el instanceof HTMLInputElement && (el.type === 'radio' || el.type === 'checkbox') ? el.closest('label') : null;
+    const r = (wrapping ?? el).getBoundingClientRect();
     if (r.height < 44 - 0.5 || r.width < 44 - 0.5) add('target<44px', el, `${Math.round(r.width)}x${Math.round(r.height)}`);
     const name =
       el.getAttribute('aria-label') ||
@@ -180,9 +410,11 @@ async function main() {
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(OUT, { recursive: true });
 
-  const server = spawn('pnpm', ['exec', 'vite', 'preview', '--port', String(PORT), '--strictPort', '--host', '127.0.0.1'], {
-    stdio: 'ignore',
-  });
+  const server = spawn(
+    'pnpm',
+    ['exec', 'vite', 'preview', '--outDir', 'dist-fixture', '--port', String(PORT), '--strictPort', '--host', '127.0.0.1'],
+    { stdio: 'ignore' },
+  );
   const stop = () => server.kill();
   process.on('exit', stop);
 
@@ -196,20 +428,26 @@ async function main() {
       const consoleErrors = [];
       page.on('console', (m) => m.type() === 'error' && consoleErrors.push(m.text()));
       page.on('pageerror', (e) => consoleErrors.push(String(e)));
+      const check = async (label, fileName, expectedNoise) => {
+        const findings = await page.evaluate(inPage);
+        await page.screenshot({ path: `${OUT}/${width}${fileName.replace(/[^a-z0-9]+/gi, '_')}.png`, fullPage: true });
+        const errs = expectedNoise ? [] : consoleErrors;
+        total += findings.length + errs.length;
+        const status = findings.length + errs.length === 0 ? 'OK ' : 'GAGAL';
+        console.log(`${status} ${width}px ${label}`);
+        for (const f of findings) console.log(`     - [${f.rule}] ${f.el} :: ${f.detail}`);
+        for (const e of errs) console.log(`     - [console] ${e}`);
+      };
       for (const route of ROUTES) {
         consoleErrors.length = 0;
         await page.goto(BASE + route, { waitUntil: 'networkidle' });
         await page.waitForTimeout(route.includes('error') ? 1800 : 600); // retry galat ±400ms
-        const findings = await page.evaluate(inPage);
-        const name = `${width}${route.replace(/[^a-z0-9]+/gi, '_')}`;
-        await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true });
-        const expectedNoise = route.includes('error') || route.includes('tidak-ada');
-        const errs = expectedNoise ? [] : consoleErrors;
-        total += findings.length + errs.length;
-        const status = findings.length + errs.length === 0 ? 'OK ' : 'GAGAL';
-        console.log(`${status} ${width}px ${route}`);
-        for (const f of findings) console.log(`     - [${f.rule}] ${f.el} :: ${f.detail}`);
-        for (const e of errs) console.log(`     - [console] ${e}`);
+        await check(route, route, route.includes('error') || route.includes('tidak-ada'));
+      }
+      for (const item of INTERACTIONS) {
+        consoleErrors.length = 0;
+        await page.goto(BASE + item.route, { waitUntil: 'networkidle' });
+        for await (const state of item.run(page)) await check(`${item.route} [${state}]`, `${item.name}_${state}`, false);
       }
       await ctx.close();
     }

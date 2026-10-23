@@ -4,7 +4,7 @@
 //
 //   pnpm gen:fixtures      -> menulis berkas
 //   (tests/db.test.mjs memastikan berkas ini tidak basi)
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 
@@ -41,7 +41,9 @@ function norm(row) {
 export async function buildFixtures() {
   const db = new PGlite();
   await db.exec(prelude);
-  await db.exec(readFileSync(new URL('migrations/20261015000001_init.sql', root), 'utf8'));
+  for (const f of readdirSync(new URL('migrations/', root)).filter((n) => n.endsWith('.sql')).sort()) {
+    await db.exec(readFileSync(new URL(`migrations/${f}`, root), 'utf8'));
+  }
   await db.exec(readFileSync(new URL('seed.sql', root), 'utf8'));
 
   const q = async (sql, params = []) => (await db.query(sql, params)).rows.map(norm);

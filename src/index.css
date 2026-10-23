@@ -18,12 +18,14 @@
   --color-surface-inset: #f4f1ea;
   --color-border: #e7e3da;
   --color-border-strong: #cfc9bc;
+  --color-border-field: #8a8478; /* garis kolom isian: 3,72:1 di atas surface, 3,53:1 di atas canvas (WCAG 1.4.11 butuh 3:1) */
   --color-ink: #1e1b4b;
   --color-ink-2: #4b5563; /* teks pendukung; satu-satunya teks sekunder di atas surface-inset */
   --color-muted: #6b7280; /* hanya di atas canvas/surface (4,6:1 dan 4,83:1) */
   --color-on-ink: #ffffff;
   --color-primary: #1e1b4b;
   --color-primary-pressed: #2e2a72;
+  --color-focus-ring: rgb(46 42 114 / 0.35);
   --color-status-due-text: #92400e;
   --color-status-due-bg: #fffbeb;
   --color-status-due-mark: #d97706;
@@ -41,6 +43,16 @@
   --text-money-hero: 32px;
   --text-money-hero--line-height: 38px;
   --text-money-hero--letter-spacing: -0.02em;
+  /* Wordmark di sampul layar Masuk saja. */
+  --text-brand: 40px;
+  --text-brand--line-height: 42px;
+  --text-brand--letter-spacing: -0.03em;
+  --text-brand-lg: 56px;
+  --text-brand-lg--line-height: 58px;
+  --text-brand-lg--letter-spacing: -0.035em;
+  --text-display: 32px;
+  --text-display--line-height: 38px;
+  --text-display--letter-spacing: -0.02em;
   --text-money-lg: 20px;
   --text-money-lg--line-height: 26px;
   --text-money-lg--letter-spacing: -0.01em;
@@ -59,6 +71,22 @@
   --text-label: 12px;
   --text-label--line-height: 16px;
   --text-label--letter-spacing: 0.02em;
+
+  /* Gerak (DESIGN.md motion). Layar baru memudar masuk sekali; fill `backwards`: tidak ada transform tersisa setelah
+     selesai (transform pada induk menjadikannya acuan bagi elemen fixed di dalamnya). */
+  --animate-page-in: page-in 180ms cubic-bezier(0.2, 0, 0, 1) backwards;
+  --animate-fade-in: fade-in 180ms cubic-bezier(0.2, 0, 0, 1) backwards;
+  @keyframes page-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
 
   --radius-*: initial;
   --radius-chip: 9999px;
@@ -97,5 +125,17 @@
   a,
   button {
     -webkit-tap-highlight-color: transparent;
+  }
+
+  /*
+   * Chrome paints autofilled inputs light blue (with !important, so a background cannot override it). An inset shadow
+   * in the field's own background (--field-bg, set by TextField) covers it, and the text stays ink.
+   */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--color-ink);
+    caret-color: var(--color-ink);
+    box-shadow: 0 0 0 1000px var(--field-bg, var(--color-surface)) inset;
   }
 }

@@ -8,6 +8,7 @@ colors:
   surface-inset: '#F4F1EA'
   border: '#E7E3DA'
   border-strong: '#CFC9BC'
+  border-field: '#8A8478'
   ink: '#1E1B4B'
   ink-2: '#4B5563'
   muted: '#6B7280'
@@ -29,6 +30,9 @@ colors:
 typography:
   font-family: Plus Jakarta Sans
   money-hero:   {size: 32px, weight: 700, line: 38px, tracking: -0.02em, numeric: tabular}
+  brand:        {size: 40px, weight: 700, line: 42px, tracking: -0.03em}   # wordmark layar Masuk saja
+  brand-lg:     {size: 56px, weight: 700, line: 58px, tracking: -0.035em}  # wordmark layar Masuk: ponsel tinggi dan >= 768px
+  display:      {size: 32px, weight: 700, line: 38px, tracking: -0.02em}
   money-lg:     {size: 20px, weight: 700, line: 26px, tracking: -0.01em, numeric: tabular}
   money-md:     {size: 16px, weight: 600, line: 22px, numeric: tabular}
   title:        {size: 20px, weight: 700, line: 26px, tracking: -0.01em}
@@ -55,6 +59,7 @@ elevation:
   fab: '0 6px 16px rgba(30, 27, 75, 0.25)'
 motion:
   duration: 150ms
+  page: 180ms (layar baru: opasitas 0→1 + geser 4px ke atas, cubic-bezier(0.2, 0, 0, 1))
   press-scale: 0.98
   reduced-motion: wajib dihormati (tanpa animasi selain perubahan opasitas)
 ---
@@ -92,6 +97,7 @@ Setiap aturan di bawah dipakai sebagai kriteria lolos/gagal saat meninjau desain
 | Permukaan kartu/baris | `surface` | #FFFFFF | |
 | Area cekung (input, segmented) | `surface-inset` | #F4F1EA | |
 | Garis | `border` | #E7E3DA | dekoratif, bukan pembawa informasi |
+| Garis kolom isian | `border-field` | #8A8478 | 3,72:1 pada `surface`, 3,53:1 pada `canvas` (WCAG 1.4.11 butuh 3:1 untuk batas komponen; `border-strong` hanya 1,65:1) |
 | Teks utama, tombol | `ink` | #1E1B4B | 15,2:1 di atas `canvas` |
 | Teks pendukung | `ink-2` | #4B5563 | di atas 7:1 pada `surface` |
 | Teks sekunder terkecil | `muted` | #6B7280 | 4,83:1 pada `surface`, 4,60:1 pada `canvas`. **Gagal (4,29:1) pada `surface-inset`**, jadi di atas area cekung pakai `ink-2` |
@@ -110,12 +116,15 @@ Font: Plus Jakarta Sans, dimuat mandiri (bukan CDN). **Verifikasi sebelum dikunc
 - Semua nominal Rupiah: `font-variant-numeric: tabular-nums`.
 - Format: `Rp1.554.329` (tanpa spasi, titik pemisah ribuan, tanpa desimal). Nilai negatif memakai tanda minus sebenarnya (U+2212): `−Rp600.000`.
 - Ukuran teks minimum 12px. Tidak ada 10px atau 11px.
+- `brand`/`brand-lg` hanya untuk wordmark `Buku Siklus` di sampul layar Masuk. Tidak dipakai untuk judul atau angka.
 - `section` (huruf kapital 13px) hanya untuk judul seksi. Jangan dipakai untuk badge.
 - Tanggal: `Sab, 25 Okt`. Tahun hanya muncul jika bukan tahun berjalan. Relatif di samping: `10 hari lagi`, `lewat 4 hari`, `hari ini`.
 
 ## 5. Tata letak
 
 - Lebar desain 360 sampai 412px, fluid. Margin sisi 16px. Pada layar lebar, konten dipusatkan dengan lebar maks 480px.
+- Pengecualian: layar Masuk (di luar alur utama) memakai margin 24px dan, mulai 768px, dua kolom (lihat bagian 11 butir 16).
+- Tidak ada tinggi tetap untuk blok konten: tinggi mengikuti isi (`min-h-dvh` hanya untuk wadah layar), sehingga viewport pendek atau zoom tidak memotong apa pun.
 - Ritme: jarak antarseksi 24px, padding baris 14px vertikal, kelipatan 4px.
 - Tap target minimum 48px. Jarak antar-target minimal 8px.
 - Navigasi bawah, 5 slot: **Beranda, Catatan, [+], Kotak Masuk, Kalender.** Kotak Masuk menampilkan angka jumlah item menunggu. **Pengaturan** diakses dari ikon roda gigi di header kanan atas, bukan tab.
@@ -135,9 +144,9 @@ Isi, berurutan: baris kecil `Siklus 1 Okt – 31 Okt`; label `Sisa setelah cicil
 
 **Segmented control** (Utang | Piutang): wadah `surface-inset`, segmen aktif putih dengan border, tinggi 44px. Label tidak boleh pecah dua baris. Jika sempit, gunakan label pendek.
 
-**Tombol.** Primer: latar `primary`, teks putih, tinggi 52px, radius 12. Sekunder: `surface` + border `border-strong`, teks `ink`. Destruktif: teks `status-overdue-text` di atas `status-overdue-bg`. Tekan: skala 0,98 dan `primary-pressed`.
+**Tombol.** Primer: latar `primary`, teks putih, tinggi 52px, radius 12. Sekunder: `surface` + border `border-strong`, teks `ink`. Destruktif: teks `status-overdue-text` di atas `status-overdue-bg`. Status: tekan = skala 0,98 + `primary-pressed`; hover = `primary-pressed` (sekunder: `surface-inset`) hanya pada perangkat ber-pointer (`@media (hover: hover)`), supaya ketukan di ponsel tidak meninggalkan warna hover; fokus keyboard = garis 2px `primary-pressed` berjarak 2px; memproses = ikon putar 20px (berhenti berputar bila gerak dikurangi) + teks `Memproses…` dengan lebar dan tinggi tetap, `aria-busy`, warna tidak berubah; kiriman ganda dicegah di handler. Nonaktif (bukan memproses): latar `surface-inset`, teks `ink-2` (7:1, tetap terbaca).
 
-**Input.** Tinggi 52px, radius 12, border 1,5px `border-strong`, fokus `primary-pressed` + ring. Input nominal: awalan `Rp` terkunci, pemisah ribuan otomatis. Placeholder memakai `muted`.
+**Input.** Tinggi 52px, radius 12, border 1,5px `border-field`, latar `surface`. Label selalu di atas (placeholder bukan label). Ikon opsional 20px `ink-2` di kiri (dekoratif, disembunyikan dari pembaca layar). Status: **normal** garis 1,5px `border-field`; **fokus** garis `primary-pressed` + ring luar 4px `focus-ring`; **galat** garis `ink` yang lebih tebal (tambahan 1px digambar di dalam, jadi tidak ada yang bergeser) + label `ink` + pesan tebal dengan ikon di bawah kolom (bukan merah, bukan hanya warna). Garis galat **tetap** saat kolom difokus; fokus lalu terlihat dari ring luar saja, sehingga mengetik di kolom yang ditandai tidak menghapus tanda galatnya. Pesan terhubung lewat `aria-describedby` dan `aria-invalid`, dan saat kirim gagal validasi fokus pindah ke kolom salah yang pertama. Mengetik di kolom menghapus pesan kolom itu saja. **Terkunci** (`readOnly`/`disabled`, mis. saat memproses): latar `surface-inset`, garis `border-strong`, teks tetap `ink`. Input nominal: awalan `Rp` terkunci, pemisah ribuan otomatis. Placeholder memakai `muted`. Elemen input menutupi seluruh kotak (awalan, ikon, dan tombol menumpang di padding-nya), dan warna autofill Chrome ditutup dengan latar kolom itu sendiri, supaya kolom yang diisi otomatis tidak tampil sebagai potongan biru di tengah kotak.
 
 **Kolom Konfirmasi (layar tambah cepat dan Kotak Masuk).** Label kecil di atas, nilai di bawah, bisa diedit. Hanya kolom dengan keyakinan rendah ditandai chip kecil netral `Periksa` dan border `status-due-mark`. Kolom yang yakin tampil biasa, tanpa lencana "Terverifikasi".
 
@@ -159,7 +168,7 @@ Isi, berurutan: baris kecil `Siklus 1 Okt – 31 Okt`; label `Sisa setelah cicil
 4. **Tambah cepat** (bottom sheet dari FAB): kotak teks dengan placeholder `Contoh: Budi pinjam 500rb, bayar tanggal 1`; tombol `Lampirkan foto struk`; setelah kirim, kartu konfirmasi dengan kolom Jenis, Pihak, Nominal, Jatuh tempo, Kategori. Tombol `Simpan` dan `Ubah manual`. Tanpa dikte suara di v1.
 5. **Kotak Masuk**: daftar notifikasi yang ditangkap dan menunggu konfirmasi. Tiap item: sumber + waktu (`BCA Mobile · hari ini 08:47`), teks notifikasi tersamar, saran pencocokan, tombol `Konfirmasi`, `Ubah`, `Bukan utang`. Item tanpa kecocokan: `Catat sebagai baru` dan `Abaikan`. Layar ini adalah tempat satu-satunya data otomatis masuk ke buku.
 6. **Kalender**: satu bulan (`Oktober 2026`), titik status pada tanggal (terlambat, jatuh tempo, lunas), tanggal gajian ditandai cincin indigo, agenda untuk tanggal terpilih di bawahnya. Empty state hanya muncul bila agenda kosong, tidak pernah bersamaan dengan agenda berisi.
-7. **Pengaturan**: Gajian (tanggal cair, gaji pokok bulanan opsional, opsi `Geser ke hari kerja sebelumnya bila jatuh di akhir pekan`); Pengingat (H-3, H-1, Hari H pukul 07:00 WITA, ringkasan gajian); Saluran (Telegram terhubung/belum, push web); Sumber notifikasi (status penerima: `Terakhir menerima 08:47`, daftar aplikasi yang diizinkan, catatan privasi yang benar); Data (ekspor CSV).
+7. **Pengaturan**: Akun (email pemilik yang masuk, `Keluar`, `Keluar dari semua perangkat` dengan konfirmasi); Gajian (tanggal cair, gaji pokok bulanan opsional, opsi `Geser ke hari kerja sebelumnya bila jatuh di akhir pekan`); Pengingat (H-3, H-1, Hari H pukul 07:00 WITA, ringkasan gajian); Saluran (Telegram terhubung/belum, push web); Sumber notifikasi (status penerima: `Terakhir menerima 08:47`, daftar aplikasi yang diizinkan, catatan privasi yang benar); Data (ekspor CSV).
 
 ## 8. Perilaku dan copy
 
@@ -224,6 +233,42 @@ Penyesuaian saat implementasi (15 Okt 2026, diverifikasi di 360px dan 412px):
 12. Ikon filter pada Catatan tidak dibuat: chip `Semua / Aktif / Terlambat / Lunas` sudah memenuhi fungsinya.
 13. Banner offline: `Kamu sedang offline. Data terakhir ditampilkan.` Tidak ada tombol; banner hilang sendiri saat koneksi kembali.
 14. Baris cicilan terakhir di Detail: judul `Cicilan ke-N`, keterangan `Cicilan terakhir`. Kata `Pelunasan` hanya untuk catatan sekali bayar.
+
+Penambahan saat membangun login (15 Okt 2026, diverifikasi di 360px dan 412px):
+
+15. **Akun di Pengaturan.** Satu-satunya mitigasi "HP hilang" yang disebut CLAUDE.md adalah sesi yang bisa dicabut, jadi `Keluar` dan `Keluar dari semua perangkat` ada di Pengaturan, bagian `Akun`. (Sejak butir 25, email ditampilkan sebagai baris `Email`, bukan teks `Masuk sebagai`.) Yang kedua bertombol destruktif dan meminta konfirmasi satu langkah yang menjelaskan akibatnya. Bagian Pengaturan yang belum dibangun dinyatakan jujur di layar (`Pengaturan lain belum dibangun.`).
+16. **Layar Masuk** (di luar tujuh layar utama; revisi ke-5, 16 Okt 2026). Konsep: **sampul buku kas** lalu halaman yang dibuka. Ponsel: sampul `ink` setinggi minimal 40% tinggi layar kecil (`40svh`; tumbuh hanya bila isinya butuh, tidak pernah mengambil sisa ruang), berisi glif aplikasi (gambar yang sama dengan favicon, tanpa kotak, tinggi 36px, rata kiri) di atas dan wordmark `Buku` / `Siklus` dua baris di bawah (`brand` 40px; `brand-lg` 56px bila tinggi layar ≥ 760px). Terukur: pada 390×844 sampul 40% layar dan jarak glif ke wordmark 118px. Halaman putih (`surface`) bersudut atas radius `sheet` menumpang pada sampul, tanpa bayangan, mengisi sisa layar dengan form di bagian atasnya: judul `Masuk` (`title`), satu kalimat bantuan `Gunakan email dan kata sandi akun kamu.` (`body`, `ink-2`), kolom `Email` (ikon amplop, `autocomplete=username` karena itu pengenal masuk yang dipasangkan pengelola sandi dengan `current-password`) dan `Kata sandi` (ikon gembok, tombol `Tampilkan kata sandi` 48px dengan `aria-pressed`, nama tetap; petunjuk `Caps Lock aktif.` saat Caps Lock menyala), lalu tombol primer `Masuk` tepat di bawah kolom. Sisa ruang ada di bawah form, sehingga pesan yang muncul tidak menggeser apa pun di atasnya: galat kolom muncul di bawah kolomnya, dan penolakan server (`FormAlert`, pesan generik yang sama untuk email dan sandi salah) muncul di **bawah** tombol. Kosong dan format email salah ditandai per kolom sebelum dikirim (`Isi email.`, `Format email belum benar. Contoh: nama@gmail.com.`, `Isi kata sandi.`); kegagalan masuk memakai pesan server yang sudah dipetakan, bukan pesan kolom. Saat memproses: kolom terkunci, tombol `aria-disabled` + `aria-busy` (tetap bisa difokus, jadi fokus keyboard tidak hilang), klik ganda atau Enter kedua tidak mengirim apa pun. Mulai 768px: dua kolom, sampul 5/12 lebar di kiri (wordmark `brand-lg`), form di kanan dengan lebar maks 384px dan judul `display`, diletakkan pada jarak tetap dari atas (`max(48px, 18svh)`, sedikit di atas tengah) dan **tidak** dipusatkan vertikal, supaya pesan yang muncul tidak memusatkan ulang dan menggeser seluruh blok. Selama layar ini terbuka, `theme-color` mengikuti `ink` (dibaca dari token). Tombol tidak ditempel ke dasar layar (Chrome Android tidak mengecilkan layout saat keyboard muncul; kolom yang difokus digeser ke atas keyboard oleh browser, dan Enter pada `Kata sandi` mengirim). Tanpa tagline, kartu di tengah, ilustrasi, gradient, atau bayangan. Tanpa pendaftaran dan tanpa "lupa kata sandi" karena aplikasi belum punya alur pemulihan; tautan yang tidak berfungsi tidak ditampilkan.
+17. **Kolom isian dan galat formulir.** Galat per kolom memakai garis tepi `ink`, ikon, dan teks tebal, bukan warna merah, supaya aturan "warna berarti status" tetap utuh.
+
+Penambahan saat membangun Catat pembayaran (15 Okt 2026, diverifikasi di 360px dan 412px):
+
+18. **Catat pembayaran** adalah layar (rute `/catatan/:id/bayar`), bukan bottom sheet, supaya tombol Kembali Android bekerja. Isi: nama catatan + `Sisa …` (satu kali), `Nominal dibayar`/`Nominal diterima` (awalan `Rp` terkunci, pemisah ribuan otomatis, terisi sebesar tagihan berikutnya), `Tanggal bayar`/`Tanggal terima` (bawaan hari ini, tidak boleh setelah hari ini), `Referensi (opsional)`, `Catatan (opsional)`, tombol `Simpan`. Tanpa pratinjau "sisa setelah ini" karena sisa dihitung SQL. State: normal, menyimpan, galat (per kolom dan per formulir), memuat, tidak ditemukan, sudah lunas.
+19. **Riwayat pembayaran di Detail**: tiap baris pembayaran bisa diketuk (ikon panah netral di kanan) dan membuka layar `Pembayaran`. Baris yang sudah dibatalkan berlabel `Dibatalkan` dengan nominal netral (bukan hijau); entri pembalik berlabel `Dikoreksi`. Tombol primer `Catat pembayaran` di bawah Memo, hanya bila sisa > 0.
+20. **Layar Pembayaran** (rute `/catatan/:id/pembayaran/:pid`): rincian entri; bila bisa dibatalkan, kolom `Alasan (opsional)` dan tombol destruktif `Batalkan pembayaran` dengan konfirmasi yang menyebut entri pembalik (`Dicatat entri pembalik −Rp450.000 bertanggal 15 Okt. Pembayaran asli tetap tampil di riwayat.`) dan tombol `Batal`. Tidak ada edit atau hapus. Koreksi nominal = batalkan lalu catat baru.
+21. **Hasil "belum pasti tersimpan"** (koneksi putus dan pemeriksaan gagal): kolom dikunci, tombol menjadi `Kirim ulang` (id yang sama, aman) dan muncul `Lihat riwayat`. Offline: penulisan ditolak dengan pesan, tidak diantre.
+
+Penambahan saat membangun Pengaturan Gajian (15 Okt 2026, diverifikasi di 360px dan 412px):
+
+22. **Baris pengaturan.** Bagian Pengaturan (Akun: `Email`, `Kata sandi`; Gajian) memakai daftar buku kas (satu permukaan, baris dipisah garis 1px): label tebal di kiri, nilai saat ini (`ink-2`, angka tabular) dan ikon panah di kanan, tinggi minimal 56px. Ketukan membuka layar isian sendiri (bukan sunting di tempat), supaya tombol Kembali Android bekerja dan galat punya ruang.
+23. **Gajian** (bagian Pengaturan + layar `/pengaturan/gajian`): baris `Tanggal gajian` (`Tanggal 1`) dan `Gaji pokok bulanan` (`Rp9.500.000` atau `Belum diisi`). Layar isian: `Tanggal gajian` (keyboard angka, 1–28, karena setiap bulan punya tanggal 28) dan `Gaji pokok bulanan (opsional)` (awalan `Rp`, kosong berarti tidak dipakai; kartu siklus Beranda lalu menampilkan `Kewajiban siklus`, bukan `Sisa kas setelah cicilan`), tombol `Simpan`. Opsi `Geser ke hari kerja sebelumnya` **belum dibangun**: artinya bergantung pada pertanyaan terbuka CLAUDE.md nomor 2. Menyimpan bersifat idempoten (mengisi nilai, bukan menambah baris), jadi galat apa pun aman diulang dengan `Simpan` lagi.
+24. **Ganti kata sandi** (baris `Kata sandi` → `Ganti` di bagian Akun; layar `/pengaturan/kata-sandi`): `Kata sandi saat ini`, `Kata sandi baru` (petunjuk `Minimal 10 karakter.`), `Ulangi kata sandi baru`, masing-masing dengan tombol tampilkan/sembunyikan sendiri; tombol primer `Ganti kata sandi`. Kata sandi saat ini selalu diminta (Supabase sendiri tidak memintanya, jadi HP yang terbuka bisa dipakai orang lain untuk menggantinya). Sandi lama salah ditandai di kolomnya sendiri (`Kata sandi saat ini salah.`); ini tidak membocorkan apa pun karena pengguna sudah masuk. Sesudah berhasil, formulir diganti panel status: `Kata sandi sudah diganti.` + `Perangkat ini tetap masuk. Perangkat lain yang masuk dengan akun ini akan diminta masuk lagi, paling lama setelah 1 jam.` + tombol sekunder `Kembali ke Pengaturan`. Tidak ada keluar otomatis.
+25. **Ganti email** (baris `Email` di bagian Akun, nilainya email saat ini, ditambah `Menunggu konfirmasi` bila ada perubahan yang belum selesai; layar `/pengaturan/email`): kartu `Email saat ini (dipakai untuk masuk)`; bila menunggu, di kartu yang sama `Menunggu konfirmasi` + alamat baru + penjelasan bahwa tautan dikirim ke kedua alamat dan masuk tetap memakai email lama sampai keduanya dibuka. Formulir: `Email baru`, `Kata sandi` (petunjuk `Untuk memastikan ini kamu.`), tombol primer `Kirim tautan konfirmasi`. Hasil tautan tampil di atas sebagai catatan netral: `Tautan pertama diterima. Buka juga tautan yang dikirim ke alamat satunya.` / `Email sudah diganti. Masuk berikutnya memakai email baru.` / galat `Tautan itu tidak berlaku atau sudah kedaluwarsa. …`. Galat pengiriman email menyebut SMTP proyek Supabase karena pemiliknya juga pengelola proyek.
+Penambahan saat membangun fitur inti (16 Okt 2026, diverifikasi di 360px dan 412px):
+
+26. **Tambah catatan** (rute `/tambah`, dari tombol + dan dari empty state; `?jenis=piutang` memilih Piutang). Ini jalur **manual** dari "Ubah manual" pada bagian 7.4; sheet Tambah cepat dengan teks bebas/foto belum dibangun karena butuh Edge Function AI. Satu kartu formulir, berurutan: `Jenis` (segmen Utang | Piutang), nama pihak (label mengikuti jenis: `Berutang kepada` / `Yang berutang kepadamu`), `Nominal total` (awalan `Rp`), `Pembayaran` (segmen Sekali bayar | Cicilan bulanan), `Jumlah cicilan` (2–120, hanya untuk cicilan), `Jatuh tempo` / `Jatuh tempo cicilan pertama`, pratinjau `Jadwal yang akan disimpan` (tiga cicilan pertama dan yang terakhir, nominal persis seperti yang disimpan), `Keterangan`, `Kategori`, `Memo` (semua opsional), tombol `Simpan`. Cicilan dibagi rata dengan bilangan bulat; sisa pembagian masuk cicilan terakhir; tanggal yang tidak ada di bulan itu dipotong ke akhir bulan. Tanggal pencatatan tidak diisi: dicatat otomatis (`created_at`). Tanggal lampau boleh (utang lama yang baru dicatat). Disimpan lewat RPC `create_debt` (satu transaksi, idempoten per id yang dibuat saat layar dibuka); sesudah berhasil membuka Detail catatan baru. Galat `belum pasti tersimpan` mengunci kolom dan tombol menjadi `Kirim ulang` (aman, id sama).
+27. **Ubah catatan** (rute `/catatan/:id/ubah`, tombol sekunder `Ubah catatan` di Detail): kartu ringkasan jenis, total, dan jadwal (tidak bisa diubah, dengan alasan singkat), formulir `Nama`, `Keterangan`, `Kategori`, `Memo` (memo yang bisa diedit dari bagian 7.3), tombol `Simpan perubahan`. Di bawahnya kartu hapus: bila belum ada pembayaran, `Hapus catatan` (destruktif) dengan konfirmasi satu langkah yang menyebut akibatnya; bila sudah ada pembayaran, kalimat netral bahwa catatan berpembayaran tidak bisa dihapus (ledger tidak pernah dihapus). Koreksi nominal = hapus lalu buat ulang.
+28. **Catat pembayaran**: tautan `Isi sisa penuh (Rp…)` di bawah nominal, hanya bila nominal berbeda dari sisa, supaya melunasi tidak perlu mengetik angka persis.
+29. **Kalender** (bagian 7.6): navigasi bulan (panah 48px, `Kembali ke bulan ini` bila bukan bulan berjalan), grid Minggu sampai Sabtu (urutan kalender Indonesia) selebar layar dikurangi 16px agar tiap tanggal ≥ 48px; tanggal terpilih diisi `ink`, hari ini tebal bergaris bawah (`aria-current=date`), tanggal gajian bercincin indigo; satu titik per status (terlambat, ≤ 3 hari, belum jatuh tempo, lunas) dengan legenda teks di bawah grid, dan tiap tanggal punya nama aksesibel lengkap (`Minggu, 11 Oktober 2026, 1 tagihan: terlambat`). Status dihitung per cicilan dengan aturan `debt_list`. `Jatuh tempo terdekat` = utang belum lunas dengan jatuh tempo hari ini atau sesudahnya, dihitung dari hari ini. Agenda tanggal terpilih memakai baris buku kas (nama, `Utang · Cicilan ke-4/12` atau `Piutang · Pelunasan`, nominal, chip status) yang membuka Detail. Bulan dan tanggal terpilih ada di URL (`?bulan=&tanggal=`), jadi kembali dari Detail mengembalikan posisi.
+30. **Kotak Masuk**: penangkap notifikasi dan layar konfirmasi belum dibangun, jadi layar ini menyatakannya (`Belum ada notifikasi yang masuk.` atau `N notifikasi menunggu, tetapi layar konfirmasinya belum dibangun.`) dengan aksi `Tambah catatan manual`. Subjudul `N menunggu konfirmasi` hanya tampil setelah jumlahnya diketahui, sehingga selalu sama dengan lencana navigasi.
+31. **Beranda**: bila ada cicilan utang dari siklus sebelumnya yang belum dibayar, kartu siklus menambahkan satu baris `Belum termasuk tunggakan siklus lalu Rp…`. Angka utama tetap `gaji − kewajiban siklus ini` (bagian 9); tunggakan dinyatakan di sampingnya, bukan disembunyikan.
+32. **Catatan**: teks pencarian ikut disimpan di URL (`?q=`) seperti tab dan filter, sehingga bertahan setelah membuka Detail lalu kembali.
+
+Penambahan navigasi dan sesi (16 Okt 2026, diverifikasi di Chromium 360px, 412px, dan 1280px terhadap Supabase lokal):
+
+33. **Transisi layar.** Layar baru memudar masuk sekali (token `animate-page-in`, 180ms, opasitas dan geser 4px; dengan `prefers-reduced-motion` hanya opasitas, `animate-fade-in`). Navigasi bawah dan banner offline berada di luar layar yang dianimasikan: tidak ikut memudar dan tidak dipasang ulang saat pindah tab. Ketukan cepat berturut-turut hanya menyisakan layar terakhir (tidak ada animasi bertumpuk). Mengganti parameter pencarian saja (filter, bulan kalender) tidak memutar ulang transisi. Tidak ada `transition: all`, tidak ada pustaka animasi; animasi tidak meninggalkan transform setelah selesai.
+34. **Posisi gulir.** Layar baru (termasuk pindah tab) selalu dibuka dari atas. Back/Forward kembali ke posisi gulir entri itu. Mengganti parameter pencarian saja tidak menggulir.
+35. **Sesudah Keluar.** Masuk berikutnya di tab itu selalu mendarat di **Beranda**, tidak di Pengaturan atau layar lain dari sebelum Keluar (juga bila pengguna menekan Back ke layar lama lalu masuk). Hanya sesi yang hilang tanpa sengaja (belum masuk, kedaluwarsa, dicabut dari perangkat lain) yang kembali ke layar yang diminta setelah masuk, mis. tautan langsung ke `/kalender` di tab baru. Selama sesi diperiksa, layar Masuk hanya menampilkan latar tinta (tanpa formulir), jadi pengguna yang sudah masuk tidak melihat formulir berkedip.
+36. **Keluar dari semua perangkat** tidak boleh gagal diam-diam: bila server tak terjangkau, layar tetap di Pengaturan dengan pesan `Tidak tersambung ke server. Periksa koneksi, lalu coba lagi.` dan perangkat ini tetap masuk, sehingga bisa diulang. `Keluar` biasa tetap berhasil saat offline (sesi di perangkat ini dihapus).
 
 ## 12. Buku (celah desain, belum divisualkan Stitch)
 

@@ -31,6 +31,14 @@ function CycleCard({ cycle, today }: { cycle: CycleSummary; today: string }) {
       <div className="mt-4">
         <SegmentBar segments={segments} />
       </div>
+      {/* The hero follows DESIGN.md (salary − this cycle's installments). Unpaid installments from earlier cycles are not
+          part of that number, so they are stated next to it instead of being left out silently. */}
+      {cycle.carryover_overdue_idr > 0 ? (
+        <p className="mt-3 text-caption text-ink-2">
+          Belum termasuk tunggakan siklus lalu{' '}
+          <Money value={cycle.carryover_overdue_idr} size="sm" className="text-ink" />.
+        </p>
+      ) : null}
       <p className="mt-4 border-t border-border pt-3 text-caption text-ink-2">
         Gajian {formatDate(cycle.next_payday, today)} {'·'} {relativeDays(cycle.days_to_payday)}
       </p>

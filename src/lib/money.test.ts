@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertRupiah, formatRupiah, percentOf, sumRupiah } from './money';
+import { assertRupiah, formatRupiah, formatRupiahInput, parseRupiahInput, percentOf, sumRupiah } from './money';
 
 describe('formatRupiah', () => {
   it('memakai titik ribuan tanpa spasi dan tanpa desimal', () => {
@@ -35,5 +35,56 @@ describe('sumRupiah / percentOf', () => {
     expect(percentOf(900000, 1500000)).toBe(60);
     expect(percentOf(1800000, 7200000)).toBe(25);
     expect(percentOf(1, 0)).toBe(0);
+  });
+});
+
+describe('parseRupiahInput', () => {
+  it('menerima angka polos, titik ribuan, dan awalan Rp', () => {
+    expect(parseRupiahInput('600000')).toBe(600000);
+    expect(parseRupiahInput('600.000')).toBe(600000);
+    expect(parseRupiahInput('1.554.329')).toBe(1554329);
+    expect(parseRupiahInput('  450.000  ')).toBe(450000);
+    expect(parseRupiahInput('Rp600.000')).toBe(600000);
+    expect(parseRupiahInput('rp 600.000')).toBe(600000);
+    expect(parseRupiahInput('0')).toBe(0);
+  });
+
+  it('menolak kosong, desimal, koma, tanda, teks, dan pengelompokan yang salah', () => {
+    for (const bad of ['', '   ', 'Rp', '1,5', '1.5', '600.00', '6.00.000', '.500', '500.', '-5', '+5', '5e3', 'abc', '12 000', '1.000,50']) {
+      expect(parseRupiahInput(bad), JSON.stringify(bad)).toBeNull();
+    }
+  });
+
+  it('menolak di luar rentang bilangan bulat aman', () => {
+    expect(parseRupiahInput('9007199254740991')).toBe(9007199254740991);
+    expect(parseRupiahInput('9007199254740992')).toBeNull();
+    expect(parseRupiahInput('99999999999999999999')).toBeNull();
+  });
+});
+
+describe('formatRupiahInput', () => {
+  it('mengelompokkan ribuan saat mengetik dan membuang karakter selain angka', () => {
+    expect(formatRupiahInput('')).toBe('');
+    expect(formatRupiahInput('6')).toBe('6');
+    expect(formatRupiahInput('600')).toBe('600');
+    expect(formatRupiahInput('6000')).toBe('6.000');
+    expect(formatRupiahInput('1554329')).toBe('1.554.329');
+    expect(formatRupiahInput('1.554.329')).toBe('1.554.329');
+    expect(formatRupiahInput('Rp 12abc34')).toBe('1.234');
+    expect(formatRupiahInput('-500')).toBe('500');
+  });
+
+  it('membuang nol di depan dan membatasi panjang agar selalu aman', () => {
+    expect(formatRupiahInput('0')).toBe('');
+    expect(formatRupiahInput('007')).toBe('7');
+    const long = formatRupiahInput('9'.repeat(30));
+    expect(long.replace(/\./g, '')).toHaveLength(15);
+    expect(Number.isSafeInteger(parseRupiahInput(long))).toBe(true);
+  });
+
+  it('hasil format selalu bisa dibaca kembali oleh parse', () => {
+    for (const n of [1, 999, 1000, 450000, 1554329, 123456789012345]) {
+      expect(parseRupiahInput(formatRupiahInput(String(n)))).toBe(n);
+    }
   });
 });

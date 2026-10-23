@@ -6,7 +6,7 @@ Sumber kebenaran desain: `DESIGN.md` (token, komponen, layar, data kanonik). Bac
 
 ## Stack (keputusan, jangan diganti tanpa diskusi)
 
-- Frontend: Vite + React + TypeScript (strict), Tailwind v4 (compiled, **bukan CDN**; `@theme` mengosongkan palet bawaan sehingga hanya token DESIGN.md yang ada), TanStack Query, Zod, `lucide-react`, react-router-dom. Font Plus Jakarta Sans via Fontsource (self-host; wajib `tabular-nums` untuk angka karena digit bawaannya proporsional). Pengelola paket: **pnpm**. `react-hook-form` dan `vite-plugin-pwa` **belum dipasang**; tambahkan saat layar form dan PWA dibangun.
+- Frontend: Vite + React + TypeScript (strict), Tailwind v4 (compiled, **bukan CDN**; `@theme` mengosongkan palet bawaan sehingga hanya token DESIGN.md yang ada), TanStack Query, Zod, `lucide-react`, react-router-dom, `@supabase/supabase-js` (sesi + PostgREST; menulis sendiri alur sesi/refresh token berarti lebih banyak kode keamanan). Font Plus Jakarta Sans via Fontsource (self-host; wajib `tabular-nums` untuk angka karena digit bawaannya proporsional). Pengelola paket: **pnpm**. `react-hook-form` dan `vite-plugin-pwa` **belum dipasang**; tambahkan saat layar form dan PWA dibangun.
 - Backend: Supabase (Postgres + RLS, Auth, Storage privat, Edge Functions TypeScript/Deno, `pg_cron` + `pg_net`).
 - AI: Claude API, hanya dari Edge Function. Nama model dari env (`AI_MODEL_TEXT`, `AI_MODEL_VISION`), jangan di-hardcode.
 - Penangkap notifikasi: MacroDroid/Tasker di HP, POST ke Edge Function `ingest-notification`.
@@ -17,7 +17,9 @@ Sumber kebenaran desain: `DESIGN.md` (token, komponen, layar, data kanonik). Bac
 
 ```
 supabase/
+  config.toml            # konfigurasi LOKAL (supabase start); sign-up dimatikan, konfirmasi email aktif seperti proyek asli. Bukan sumber kebenaran proyek asli
   migrations/            # SQL berurutan, jangan edit migrasi yang sudah diterapkan
+  scripts/first-book.sql # dijalankan manual SEKALI di SQL Editor untuk membuat buku pertama (bukan migrasi)
   functions/
     ingest-notification/ # webhook dari MacroDroid
     parse-entry/         # teks/foto -> inbox_events (AI)
@@ -26,27 +28,32 @@ supabase/
 tests/
   db.test.mjs            # uji skema + RLS dengan PGlite (node --test)
 src/
-  app/                   # routing, provider
-  lib/{money,dates,status,derive,cx}.ts   # supabase.ts menyusul bersama auth
-  data/                  # DataSource, skema Zod, fixture hasil SQL
-  pages/                 # layar (Beranda, Catatan, Detail, Placeholder)
+  app/                   # routing, guard (RequireAuth), gerbang data (DataGate), posisi gulir (ScrollManager), galat konfigurasi
+  auth/                  # AuthService (Supabase + fixture), pemetaan galat, validasi akun, tautan email (authLink), tanda keluar-sendiri (signOutMark), AuthProvider
+  lib/{money,dates,status,derive,schedule,calendar,cx,config,env,supabase}.ts
+  data/                  # DataSource, konteks, skema Zod, fixture hasil SQL
+  integration/           # uji terhadap Supabase LOKAL sungguhan (*.local.test.ts; pnpm test:local)
+  pages/                 # layar (Beranda, Catatan, Detail, TambahCatatan, UbahCatatan, Kalender, KotakMasuk, Masuk, Pengaturan, Gajian, KataSandi, Email, Placeholder)
   components/{ui,layout}/  # komponen sesuai DESIGN.md
-scripts/                 # gen-fixtures.mjs, audit-ui.mjs
+scripts/                 # gen-fixtures.mjs, audit-ui.mjs, e2e-local.mjs, lib/browser.mjs (pembantu bersama)
 ```
 
 ## Perintah
 
-- `pnpm dev`, `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test` (vitest, 50 tes)
-- `pnpm test:db` (14 tes skema + RLS + fixture tidak basi, PGlite, ±40 detik)
+- `pnpm dev`, `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test` (vitest, 168 tes termasuk uji kontrak SQL → Zod)
+- Env (`.env.local`, lihat `.env.example`): `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (hanya kunci publishable/anon). Build produksi **gagal** bila env kosong atau berisi kunci rahasia (`sb_secret_`/`service_role`). Data contoh hanya lewat `pnpm dev:fixture` (`--mode fixture`); build biasa tidak memuatnya.
+- `pnpm test:db` (24 tes skema + RLS + ledger + `create_debt` + hak kolom + fixture tidak basi, PGlite, ±50 detik)
+- `pnpm test:local` (63 tes integrasi ke Supabase lokal sungguhan: GoTrue + PostgREST + RLS lewat HTTP, termasuk tulis ledger dengan gangguan jaringan yang disuntikkan dan ganti email dengan tautan asli dari Mailpit; butuh Docker dan `supabase start` termasuk Mailpit; menolak URL non-lokal karena ledger tidak bisa dihapus)
+- `pnpm e2e:local` (25 langkah di Chromium asli terhadap stack lokal, dicek silang ke database: login, data, sesi bertahan setelah reload, Catat pembayaran (klik ganda = satu baris), offline ditolak, pembatalan dengan entri pembalik, pelunasan, Tambah utang dan piutang (klik ganda = satu catatan, reload), pencarian/filter, Kalender, ubah memo, hapus, lunasi, Gajian, Ganti kata sandi, Ganti email (kedua tautan dari Mailpit), navigasi (pindah tab cepat, posisi gulir, Back/Forward, gerak dikurangi), Keluar dari Pengaturan lalu masuk = Beranda (juga setelah Back), pemulihan sesi lambat tanpa kilasan formulir, Keluar dari semua perangkat saat server tak terjangkau (tetap masuk + pesan) lalu berhasil, tautan langsung di tab baru 1280px; membangun sendiri ke `dist-e2e/`)
 - `pnpm gen:fixtures` membangkitkan ulang `src/data/fixtures.generated.json` dari SQL asli. Wajib dijalankan setelah migrasi atau `seed.sql` berubah; `test:db` gagal bila lupa.
-- `pnpm audit:ui` (setelah `pnpm build`): membuka build di Chromium 360px dan 412px, memeriksa overflow, teks < 12px, kontras, target < 44px, nama aksesibel, emoji, angka tabular; tangkapan layar ke `audit-out/`. Simulasi state: `?fixture=loading|slow|error|empty`.
-- `supabase start`, `supabase db reset`, `supabase functions serve` (belum dijalankan terhadap Supabase asli).
-- Sebelum menyatakan tugas selesai: `pnpm typecheck && pnpm lint && pnpm test && pnpm test:db` harus lulus.
+- `pnpm audit:ui` (membangun sendiri dalam mode fixture ke `dist-fixture/`): membuka build di Chromium 360px dan 412px, memeriksa overflow, teks < 12px, kontras, target < 44px, nama aksesibel, emoji, angka tabular, termasuk keadaan setelah interaksi; tangkapan layar ke `audit-out/`. Simulasi state: `?fixture=loading|slow|error|empty|signedout`.
+- `supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor` (db, gateway, auth, REST, Mailpit di 127.0.0.1:54324; cukup untuk `test:local` dan `e2e:local`), `supabase db reset`. Migrasi + seed sudah terbukti lolos di Postgres Supabase lokal; `supabase functions serve` belum dijalankan.
+- Sebelum menyatakan tugas selesai: `pnpm typecheck && pnpm lint && pnpm test && pnpm test:db` harus lulus. Bila menyentuh auth, data, atau tulis: jalankan juga `pnpm test:local` dan `pnpm e2e:local` (butuh Supabase lokal menyala); bila menyentuh UI: `pnpm audit:ui`.
 
 ## Status implementasi
 
-Sudah: skema + RLS + seed (teruji), lapisan data (DataSource + fixture dari SQL), komponen UI, layar Beranda, Catatan, Detail (baca saja).
-Belum: login + sumber data Supabase, Catatan baru (Tambah catatan), Catat pembayaran, Kotak Masuk, Kalender, Pengaturan, RPC `create_debt`, Edge Function, PWA, pemilih buku. Rute belum dibangun menampilkan `Placeholder` yang jujur.
+Sudah: skema + RLS + seed (teruji di PGlite dan Postgres Supabase lokal), lapisan data (DataSource: fixture dari SQL dan Supabase), komponen UI, layar Beranda, Catatan, Detail, **Tambah catatan** (manual, utang/piutang, sekali bayar atau cicilan bulanan, lewat RPC `create_debt`), **Ubah catatan** (teks + memo) dan **hapus** (hanya tanpa pembayaran), **Kalender**, login pemilik (email + kata sandi), layar Masuk, Pengaturan bagian Akun (Ganti email, Ganti kata sandi, Keluar, Keluar dari semua perangkat) dan Gajian, transisi layar dan posisi gulir (DESIGN.md butir 33–36) (tanggal gajian, gaji pokok), Catat pembayaran (termasuk `Isi sisa penuh`) dan pembatalan lewat entri pembalik. Jalur baca dan tulis Supabase teruji end-to-end di browser terhadap stack lokal (belum terhadap proyek asli; migrasi `20261016000001_create_debt.sql` harus di-`db push` ke proyek asli).
+Belum: Tambah cepat (teks bebas/foto, butuh Edge Function AI), Kotak Masuk (layar konfirmasi + penangkap notifikasi; layarnya kini menyatakan status jujur), foto bukti pembayaran (`proof_path`, butuh bucket Storage), tombol `Ingatkan lewat WhatsApp`, mengubah nominal/jadwal catatan yang sudah ada (koreksi = hapus lalu buat ulang), Pengaturan (selain Akun dan Gajian; opsi geser ke hari kerja belum), Edge Function, PWA, pemilih buku. Rute belum dibangun menampilkan `Placeholder` yang jujur.
 
 ## Model data: buku (keputusan)
 
@@ -56,7 +63,9 @@ Belum: login + sumber data Supabase, Catatan baru (Tambah catatan), Catat pembay
 - Buku tidak dihapus, hanya diarsipkan (`archived_at`). Pembayaran append-only; koreksi lewat entri pembalik.
 - **Keputusan (15 Okt 2026): aplikasi hanya dipegang pemilik.** Tidak ada pengguna kedua. Buku untuk orang lain (mis. pacar) adalah buku terpisah milik akun pemilik, diinput manual oleh pemilik. Tabel `book_members` tetap ada (pemilik otomatis jadi `owner`), tapi **UI undangan/berbagi tidak dibangun**. Jangan membangunnya tanpa keputusan baru.
 - Catatan dan notifikasi yang masuk otomatis hanya milik perangkat pengguna. Buku orang lain **tidak punya penangkap otomatis**; isinya diinput manual/teks bebas.
-- Membuat catatan beserta jadwal cicilan harus atomik: buat RPC `create_debt` (catatan + cicilan dalam satu transaksi) dan cek `debt_integrity_issues` kosong. Jangan menyisipkan dari klien dalam dua langkah terpisah.
+- Membuat catatan beserta jadwal cicilan harus atomik: RPC `create_debt` (migrasi `20261016000001`, SECURITY INVOKER: RLS pemanggil berlaku) membuat catatan + cicilan dalam satu transaksi, memvalidasi ulang semua batas form (nama 1–80, teks, total > 0, 1–120 cicilan bilangan bulat > 0, jumlah = total, tanggal 2000–2100), dan idempoten per id buatan klien (`src/data/supabaseSource.ts` memakai `settleWrite` seperti ledger). Jangan menyisipkan dari klien dalam dua langkah terpisah.
+- `debts` hanya bisa di-UPDATE pada kolom teks (`name`, `description`, `category`, `memo`, `match_aliases`; hak kolom). Total, jenis, dan buku tidak bisa diubah lewat API. Hapus hanya untuk catatan tanpa pembayaran (FK `payments` ON DELETE RESTRICT; klien memetakan 23503 ke `has_payments`).
+- Aturan Beranda saat ini: `Sisa kas setelah cicilan` = gaji − cicilan utang yang jatuh tempo di siklus ini (termasuk yang sudah dibayar). Tunggakan siklus lalu (`carryover_overdue_idr`) **tidak** dikurangkan; ditampilkan sebagai baris terpisah. Piutang tidak memengaruhi kewajiban. Pembayaran sebagian dihitung `terbayar` siklus hanya bila satu cicilan penuh terbayar (alokasi kumulatif dari cicilan terawal).
 - Perhitungan (status, siklus, sisa) ada di fungsi SQL `debt_list` dan `cycle_summary`; frontend hanya menampilkan. `p_today` bisa diisi untuk tes.
 
 ## Privasi data orang lain
@@ -70,6 +79,7 @@ Belum: login + sumber data Supabase, Catatan baru (Tambah catatan), Catat pembay
 - Rupiah disimpan sebagai `bigint` (tanpa desimal) di DB. Di JS memakai `number` bilangan bulat; semua operasi lewat `src/lib/money.ts` dan wajib `Number.isSafeInteger`. **Dilarang float untuk uang.**
 - Format tampilan hanya lewat `formatRupiah()`: `Rp1.554.329`, negatif `−Rp600.000` (U+2212).
 - Pembayaran adalah **ledger append-only** (`payments`). Sisa utang = total − jumlah pembayaran, dihitung lewat view SQL. Jangan menyimpan "sisa" sebagai kolom yang diedit. Koreksi dilakukan dengan entri baru (pembalik), bukan UPDATE/DELETE.
+- Menulis ke ledger dari klien: `id` dibuat klien saat layar dibuka dan dipakai ulang untuk setiap kirim ulang; setelah galat APA PUN, baris dicari berdasarkan `id` (`src/data/settle.ts`), karena kirim ulang yang sebenarnya sudah tersimpan ditolak trigger dengan pesan menyesatkan ("melebihi total"/"tidak boleh negatif"). Mutasi ledger memakai `networkMode: 'always'`: tidak ada antrean tulis offline tersembunyi. Batas tanggal (tidak setelah hari ini) dan panjang teks hanya ditegakkan di klien; database menerimanya.
 
 ### Tanggal dan zona waktu
 - Zona acuan bisnis: **Asia/Makassar (WITA, UTC+8)**. Tanggal jatuh tempo bertipe `date`; waktu kejadian `timestamptz` (UTC).
@@ -88,7 +98,12 @@ Belum: login + sumber data Supabase, Catatan baru (Tambah catatan), Catat pembay
 - RLS aktif di **semua** tabel sejak migrasi pertama. Kebijakan berbasis keanggotaan buku (`can_read`/`can_write`). Tes RLS ada di `tests/db.test.mjs` (orang asing, `anon`, `viewer`, `editor`) dan harus tetap lulus.
 - Service role key hanya di Edge Function, tidak pernah di klien.
 - **Satu pemilik = matikan pendaftaran publik.** Di Supabase Auth nonaktifkan sign-up setelah akun pemilik dibuat (atau batasi ke satu email). RLS tetap mengisolasi data, tapi pendaftaran terbuka memberi orang asing akun dan beban pada kuota proyek.
-- HP hilang = data keuangan terbuka. Sesi PWA harus bisa dicabut (Supabase: sign out semua sesi) dan layar kunci perangkat aktif. Pertimbangkan kunci aplikasi (PIN/biometrik) setelah v1.
+- HP hilang = data keuangan terbuka. Sesi PWA harus bisa dicabut (Supabase: sign out semua sesi) dan layar kunci perangkat aktif. Pertimbangkan kunci aplikasi (PIN/biometrik) setelah v1. **Batas yang terbukti (uji lokal):** "Keluar dari semua perangkat" mencabut refresh token dan ditolak GoTrue, tetapi token akses yang sudah terbit tetap diterima PostgREST sampai kedaluwarsa. Persingkat `JWT expiry` di dashboard (Authentication > Sessions/JWT) untuk mempersempit jendela itu.
+- Keluar (`AuthService.signOut`): supabase-js menghapus sesi lokal **walau `/logout` gagal** (mis. offline). Untuk `local` itu benar (perangkat ini keluar). Untuk `global` itu berbahaya: perangkat ini keluar, perangkat lain tetap masuk, tanpa pesan. Karena itu `global` = `signOut({ scope: 'others' })` dulu (tidak pernah menghapus sesi lokal saat gagal), baru `signOut({ scope: 'local' })`; bila langkah pertama gagal, pengguna tetap masuk dan melihat galat (**terbukti lokal**: tes integrasi + e2e). Jangan kembali ke `signOut({ scope: 'global' })` langsung.
+- Tujuan setelah masuk: `RequireAuth` menyimpan `from` hanya untuk sesi yang hilang tanpa sengaja. Keluar oleh pengguna (`AuthState.signedOut.byUser`, ditandai di `sessionStorage` kunci `buku-siklus:signed-out-by-user`, hanya tab itu, dihapus saat masuk lagi) tidak menyimpan `from`, sehingga Back ke layar lama lalu masuk tetap mendarat di Beranda. Jangan membersihkan penyimpanan lain atau menyentuh token Supabase secara manual.
+- Ganti kata sandi (`AuthService.changePassword`): kata sandi saat ini diverifikasi dulu lewat masuk ulang, karena Supabase tidak memintanya. Minimal 10 karakter dan maksimal 72 byte (batas bcrypt) di klien; samakan "Minimum password length" di dashboard (Authentication > Providers > Email) agar server ikut menegakkannya. **Terbukti (uji lokal):** sesudah ganti, refresh token perangkat lain dicabut, sesi perangkat ini bertahan; token akses yang sudah terbit tetap berlaku sampai kedaluwarsa (sama seperti di atas). "Secure password change" dibiarkan mati; alur ini belum diuji dengan opsi itu menyala (opsi itu meminta kode lewat email bila sesi lebih tua dari 24 jam, sedangkan masuk ulang di atas membuat sesi baru).
+- Ganti email (`AuthService.changeEmail`): kata sandi diverifikasi dulu (masuk ulang). Supabase mengirim tautan ke email lama dan baru; email baru berlaku setelah keduanya dibuka (**terbukti lokal:** GoTrue hanya meminta dua konfirmasi bila "Confirm email" aktif, karena itu `enable_confirmations = true` di config.toml). Tautan kembali ke `/pengaturan/email` dengan hasil di fragmen URL; tautan terakhir membawa **sesi baru** (access + refresh token). Aplikasi tidak pernah masuk dari URL: `main.tsx` membuang fragmen dari address bar sebelum render (sisa `?konfirmasi=`), lalu mencabut sesi itu (`/logout` dengan tokennya sendiri). Butuh tugas di dashboard: SMTP sendiri (pengirim bawaan hanya mengirim ke anggota tim proyek, maks. beberapa email per jam) dan alamat aplikasi di Authentication > URL Configuration (Site URL + Redirect URLs), kalau tidak tautan mendarat di Site URL.
+- Hanya kunci publishable/anon yang boleh ada di env klien (`VITE_*` ditanam ke bundle). `config.ts` menolak `sb_secret_` dan JWT `service_role`, dan `vite build` gagal bila terdeteksi. Cache TanStack dikosongkan saat keluar; sesi tidak dibaca dari URL (`detectSessionInUrl: false`).
 - Webhook `ingest-notification`: verifikasi HMAC-SHA256 (header tanda tangan + timestamp, toleransi ±5 menit), allowlist nama paket aplikasi, kunci idempotensi (hash paket+waktu+teks), batasi laju. Tolak selain itu dengan 401/429, tanpa detail.
 - Bucket Storage untuk foto struk privat; akses lewat signed URL berumur pendek.
 - Jangan mencatat (log) isi notifikasi, nominal, atau nama pihak ke log fungsi.

@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Search } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { LedgerList, ListDebtRow } from '../components/DebtRows';
@@ -25,7 +24,8 @@ const TABS: Array<{ id: Tab; label: string; direction: Direction; noun: string }
 
 export function Catatan() {
   const [params, setParams] = useSearchParams();
-  const [query, setQuery] = useState('');
+  // In the URL (like tab and filter) so the search survives opening a record and coming back.
+  const query = params.get('q') ?? '';
   const debts = useDebts();
 
   const tab = TABS.find((t) => t.id === params.get('tab')) ?? TABS[0]!;
@@ -69,7 +69,7 @@ export function Catatan() {
           <input
             type="search"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => setParam('q', e.target.value === '' ? null : e.target.value)}
             placeholder="Cari nama atau catatan"
             className="h-12 w-full rounded-input border border-border-strong bg-surface pr-4 pl-11 text-body text-ink placeholder:text-muted"
           />
@@ -142,7 +142,10 @@ function Rows({
         <EmptyState
           title={`Belum ada catatan ${tab.noun}.`}
           action={
-            <Link to="/tambah" className="inline-flex min-h-12 items-center px-4 text-body font-semibold underline">
+            <Link
+              to={tab.direction === 'owed' ? '/tambah?jenis=piutang' : '/tambah'}
+              className="inline-flex min-h-12 items-center px-4 text-body font-semibold underline"
+            >
               Tambah {tab.noun}
             </Link>
           }
